@@ -228,6 +228,36 @@ def pilot_spreads(
     return np.array(out)
 
 
+# Elements that are legitimately single-atom "molecules" without bonds -- noble
+# gases and the common monatomic ions -- so a bond-less configuration made only of
+# these is fine (a rare-gas liquid, a molten salt).
+BONDLESS_OK = frozenset(
+    "He Ne Ar Kr Xe Rn Li Na K Rb Cs Fr Be Mg Ca Sr Ba Ra F Cl Br I".split()
+)
+
+
+def check_bonds(configuration):
+    """Raise if the configuration has no bonds but clearly consists of molecules.
+
+    Molecules are found from the bonds, so a configuration read from a format
+    without connectivity (e.g. extended XYZ without bond perception) would be
+    treated as one atom per molecule and the "clusters" would silently be
+    groups of atoms. Configurations made only of noble-gas atoms or monatomic
+    ions are allowed through.
+    """
+    if configuration.n_atoms < 2 or configuration.bonds.n_bonds > 0:
+        return
+    offending = sorted(set(configuration.atoms.symbols) - BONDLESS_OK)
+    if offending:
+        raise ValueError(
+            "The configuration has no bonds, so its molecules cannot be identified "
+            f"(it contains {', '.join(offending)}, which form molecules). Structures "
+            "from formats without connectivity, such as extended XYZ, need their "
+            "bonds perceived first: turn on 'Perceive bonds' in the Read Structure "
+            "step, or call configuration.perceive_bonds()."
+        )
+
+
 def bond_index_pairs(configuration):
     """The bonds of a configuration as 0-based atom-index pairs, with orders.
 
@@ -372,6 +402,7 @@ def extract_nmers(
         seen = set()
 
     periodic = configuration.periodicity != 0
+    check_bonds(configuration)
     molecules = [np.asarray(m) for m in configuration.find_molecules(as_indices=True)]
     n_mol = len(molecules)
     if n_mol < n:

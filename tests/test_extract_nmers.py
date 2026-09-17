@@ -8,6 +8,7 @@ import pytest
 import extract_clusters_step
 from extract_clusters_step.cluster_sampling import (
     PROPERTY_TAG,
+    check_bonds,
     cluster_summary,
     extract_nmers,
 )
@@ -254,3 +255,38 @@ def test_node_run(water_box, tmp_path, monkeypatch):
     P["random seed"].value = "4"
     node.run()
     assert db.system.name == "water box clusters"
+
+
+def test_bondless_configuration_is_rejected(water_box):
+    """No bonds + molecular elements -> a clear error, not atom 'clusters'."""
+    water_box.bonds.delete()
+    assert water_box.bonds.n_bonds == 0
+    with pytest.raises(ValueError, match="Perceive bonds"):
+        extract_nmers(water_box, 3, 5, contact_elements=["O"])
+    # perceiving the bonds makes it work again
+    assert water_box.perceive_bonds() == 2 * 216
+    confs, recs, info = extract_nmers(water_box, 3, 5, contact_elements=["O"], rng=1)
+    assert len(confs) == 5
+
+
+def test_bondless_rare_gas_is_allowed(db):
+    """A bond-less argon box is legitimately one atom per molecule."""
+    rng = np.random.default_rng(0)
+    L = 20.0
+    xyz = rng.uniform(0, L, (100, 3))
+    conf = db.create_system(name="Ar").create_configuration(
+        name="liquid",
+        periodicity=3,
+        coordinate_system="Cartesian",
+        cell_parameters=[L, L, L, 90, 90, 90],
+    )
+    conf.atoms.append(
+        atno=[18] * 100,
+        x=xyz[:, 0].tolist(),
+        y=xyz[:, 1].tolist(),
+        z=xyz[:, 2].tolist(),
+    )
+    check_bonds(conf)  # no error
+    confs, recs, info = extract_nmers(conf, 3, 5, cutoff=4.5, rng=2)
+    assert len(confs) == 5
+    assert all(c.n_atoms == 3 for c in confs)

@@ -13,7 +13,10 @@ interactions.
 How clusters are chosen
 -----------------------
 
-Molecules are found from the bonds (an ion is a one-atom molecule). Two
+Molecules are found from the bonds (an ion is a one-atom molecule), so the
+structure must carry connectivity: a frame read from an extended XYZ trajectory
+needs the Read Structure step's *Perceive bonds* option (the default), and the
+step stops with an error if a molecular structure arrives without bonds. Two
 molecules are *in contact* if any of their contact atoms -- all atoms, or the
 elements you list, e.g. ``O`` for water hydrogen bonds -- are within the
 contact cutoff under minimum-image conventions. A cluster is a **connected**
