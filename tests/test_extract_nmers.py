@@ -263,7 +263,9 @@ def test_bondless_configuration_is_rejected(water_box):
     assert water_box.bonds.n_bonds == 0
     with pytest.raises(ValueError, match="Perceive bonds"):
         extract_nmers(water_box, 3, 5, contact_elements=["O"])
-    # perceiving the bonds makes it work again
+    # perceiving the bonds makes it work again (molsystem >= 2026.9.17)
+    if not hasattr(water_box, "perceive_bonds"):
+        pytest.skip("molsystem without perceive_bonds")
     assert water_box.perceive_bonds() == 2 * 216
     confs, recs, info = extract_nmers(water_box, 3, 5, contact_elements=["O"], rng=1)
     assert len(confs) == 5
