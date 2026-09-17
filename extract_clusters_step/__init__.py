@@ -9,9 +9,22 @@ A SEAMM plug-in for extracting molecular clusters from a periodic cell of molecu
 # the extract_clusters_step package.
 
 from extract_clusters_step.extract_clusters import ExtractClusters  # noqa: F401, E501
-from extract_clusters_step.extract_clusters_parameters import ExtractClustersParameters  # noqa: F401, E501
-from extract_clusters_step.extract_clusters_step import ExtractClustersStep  # noqa: F401, E501
-from extract_clusters_step.tk_extract_clusters import TkExtractClusters  # noqa: F401, E501
+from extract_clusters_step.extract_clusters_parameters import (  # noqa: F401
+    ExtractClustersParameters,
+)
+from extract_clusters_step.extract_clusters_step import (  # noqa: F401
+    ExtractClustersStep,
+)
+from extract_clusters_step.tk_extract_clusters import (  # noqa: F401
+    TkExtractClusters,
+)
+from extract_clusters_step.metadata import metadata  # noqa: F401
+from extract_clusters_step.cluster_sampling import (  # noqa: F401
+    PROPERTY_TAG,
+    classify_motif,
+    cluster_summary,
+    extract_nmers,
+)
 
 # Handle versioneer
 from ._version import get_versions

@@ -4,6 +4,7 @@
 
 import pprint  # noqa: F401
 import tkinter as tk
+import tkinter.ttk as ttk
 
 import extract_clusters_step  # noqa: F401
 import seamm
@@ -21,10 +22,6 @@ class TkExtractClusters(seamm.TkNode):
         The flowchart that we belong to.
     node : Node = None
         The corresponding node of the non-graphical flowchart
-    namespace : str
-        The namespace of the current step.
-    tk_subflowchart : TkFlowchart
-        A graphical Flowchart representing a subflowchart
     canvas: tkCanvas = None
         The Tk Canvas to draw on
     dialog : Dialog
@@ -66,8 +63,6 @@ class TkExtractClusters(seamm.TkNode):
             The graphical flowchart that we are in.
         node: Node
             The non-graphical node for this step.
-        namespace: str
-            The stevedore namespace for finding sub-nodes.
         canvas: Canvas
            The Tk canvas to draw on.
         x: float
@@ -118,9 +113,58 @@ class TkExtractClusters(seamm.TkNode):
         # Shortcut for parameters
         P = self.node.parameters
 
+        # Group the widgets into labeled frames
+        self["clusters frame"] = ttk.LabelFrame(
+            frame,
+            borderwidth=4,
+            relief="sunken",
+            text="Clusters",
+            labelanchor="n",
+            padding=10,
+        )
+        self["stratification frame"] = ttk.LabelFrame(
+            frame,
+            borderwidth=4,
+            relief="sunken",
+            text="Stratification",
+            labelanchor="n",
+            padding=10,
+        )
+        self["output frame"] = ttk.LabelFrame(
+            frame,
+            borderwidth=4,
+            relief="sunken",
+            text="Output",
+            labelanchor="n",
+            padding=10,
+        )
+        parents = {
+            "cluster sizes": "clusters frame",
+            "number of clusters": "clusters frame",
+            "contact cutoff": "clusters frame",
+            "contact elements": "clusters frame",
+            "random seed": "clusters frame",
+            "attempts per cluster": "clusters frame",
+            "spread metric": "stratification frame",
+            "stratification": "stratification frame",
+            "number of bins": "stratification frame",
+            "bin edges": "stratification frame",
+            "balance motifs": "stratification frame",
+            "system name": "output frame",
+            "name prefix": "output frame",
+            "store properties": "output frame",
+            "make current": "output frame",
+        }
+
         # Then create the widgets
         for key in P:
-            self[key] = P[key].widget(frame)
+            self[key] = P[key].widget(self[parents[key]])
+
+        # Comboboxes whose value changes the layout re-lay out the dialog.
+        for key in ("stratification",):
+            self[key].combobox.bind("<<ComboboxSelected>>", self.reset_dialog)
+            self[key].combobox.bind("<Return>", self.reset_dialog)
+            self[key].combobox.bind("<FocusOut>", self.reset_dialog)
 
         # and lay them out
         self.reset_dialog()
@@ -128,13 +172,10 @@ class TkExtractClusters(seamm.TkNode):
     def reset_dialog(self, widget=None):
         """Layout the widgets in the dialog.
 
-        The widgets are chosen by default from the information in
-        Extract Clusters_parameter.
-
-        This function simply lays them out row by row with
-        aligned labels. You may wish a more complicated layout that
-        is controlled by values of some of the control parameters.
-        If so, edit or override this method
+        Only the stratification controls that apply to the chosen scheme are
+        shown: the number of bins for 'quantile bins', the edges for 'explicit
+        bin edges', and neither when stratification is off, so an unusable
+        combination cannot be built in the editor.
 
         Parameters
         ----------
@@ -153,20 +194,58 @@ class TkExtractClusters(seamm.TkNode):
         frame = self["frame"]
         for slave in frame.grid_slaves():
             slave.grid_forget()
-
-        # Shortcut for parameters
-        P = self.node.parameters
+        for name in ("clusters frame", "stratification frame", "output frame"):
+            for slave in self[name].grid_slaves():
+                slave.grid_forget()
 
         # keep track of the row in a variable, so that the layout is flexible
         # if e.g. rows are skipped to control such as "method" here
         row = 0
-        widgets = []
-        for key in P:
-            self[key].grid(row=row, column=0, sticky=tk.EW)
-            widgets.append(self[key])
-            row += 1
+        self["clusters frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
+        row += 1
+        self["stratification frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
+        row += 1
+        self["output frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
+        row += 1
+        frame.columnconfigure(0, weight=1)
 
-        # Align the labels
+        # The clusters
+        widgets = []
+        for i, key in enumerate(
+            (
+                "cluster sizes",
+                "number of clusters",
+                "contact cutoff",
+                "contact elements",
+                "random seed",
+                "attempts per cluster",
+            )
+        ):
+            self[key].grid(row=i, column=0, sticky=tk.EW)
+            widgets.append(self[key])
+        sw.align_labels(widgets, sticky=tk.E)
+
+        # Stratification, showing only the controls the scheme needs
+        strat = self["stratification"].get()
+        keys = ["spread metric", "stratification"]
+        if strat == "quantile bins":
+            keys.append("number of bins")
+        elif strat == "explicit bin edges":
+            keys.append("bin edges")
+        keys.append("balance motifs")
+        widgets = []
+        for i, key in enumerate(keys):
+            self[key].grid(row=i, column=0, sticky=tk.EW)
+            widgets.append(self[key])
+        sw.align_labels(widgets, sticky=tk.E)
+
+        # Output
+        widgets = []
+        for i, key in enumerate(
+            ("system name", "name prefix", "store properties", "make current")
+        ):
+            self[key].grid(row=i, column=0, sticky=tk.EW)
+            widgets.append(self[key])
         sw.align_labels(widgets, sticky=tk.E)
 
     def right_click(self, event):

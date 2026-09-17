@@ -5,7 +5,6 @@ Control parameters for the Extract Clusters step in a SEAMM flowchart
 
 import logging
 import seamm
-import pprint  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -14,78 +13,245 @@ class ExtractClustersParameters(seamm.Parameters):
     """
     The control parameters for Extract Clusters.
 
-    The developer will add a dictionary of Parameters to this class.
-    The keys are parameters for the current plugin, which themselves
-    might be dictionaries.
+    The keys are the parameters for this plug-in; each value is a dictionary
+    describing that parameter (default, kind, units, enumeration, format,
+    description, help).
 
-    You need to replace the "time" example below with one or more
-    definitions of the control parameters for your plugin and application.
-
-    Attributes
-    ----------
-    parameters : {"kind", "default", "default_units", "enumeration",
-                  "format_string", description", help_text"}
+    parameters : {str: {str: str}}
         A dictionary containing the parameters for the current step.
-        Each key of the dictionary is a dictionary that contains the
-        the following keys: kind, default, default_units, enumeration,
-        format_string, description and help text.
-
-    parameters["kind"]: custom
-        Specifies the kind of a variable. While the "kind" of a variable might
-        be a numeric value, it may still have enumerated custom values
-        meaningful to the user. For instance, if the parameter is
-        a convergence criterion for an optimizer, custom values like "normal",
-        "precise", etc, might be adequate. In addition, any
-        parameter can be set to a variable of expression, indicated by having
-        "$" as the first character in the field. For example, $OPTIMIZER_CONV.
-
-    parameters["default"] : "integer" or "float" or "string" or "boolean" or
-        "enum" The default value of the parameter, used to reset it.
-
-    parameters["default_units"] : str
-        The default units, used for resetting the value.
-
-    parameters["enumeration"]: tuple
-        A tuple of enumerated values.
-
-    parameters["format_string"]: str
-        A format string for "pretty" output.
-
-    parameters["description"]: str
-        A short string used as a prompt in the GUI.
-
-    parameters["help_text"]: tuple
-        A longer string to display as help for the user.
 
     See Also
     --------
-    ExtractClusters, TkExtractClusters, ExtractClusters
-    ExtractClustersParameters, Extract ClustersStep
-
-    Examples
-    --------
-    parameters = {
-        "time": {
-            "default": 100.0,
-            "kind": "float",
-            "default_units": "ps",
-            "enumeration": tuple(),
-            "format_string": ".1f",
-            "description": "Simulation time:",
-            "help_text": ("The time to simulate in the dynamics run.")
-        },
-    }
+    ExtractClusters, TkExtractClusters, ExtractClustersStep
     """
 
     parameters = {
-        "time": {
-            "default": 100.0,
-            "kind": "float",
-            "default_units": "ps",
+        # ------------------------------------------------------------------ #
+        # What to extract
+        # ------------------------------------------------------------------ #
+        "cluster sizes": {
+            "default": "3",
+            "kind": "string",
+            "default_units": "",
             "enumeration": tuple(),
-            "format_string": ".1f",
-            "description": "Simulation time:",
-            "help_text": ("The time to simulate in the dynamics run."),
+            "format_string": "",
+            "description": "Cluster sizes (molecules):",
+            "help_text": (
+                "The number of molecules per cluster. A comma- or space-separated "
+                "list, e.g. '3, 4', extracts a set of each size from the same "
+                "frame. Each must be at least 2."
+            ),
+        },
+        "number of clusters": {
+            "default": 50,
+            "kind": "integer",
+            "default_units": "",
+            "enumeration": tuple(),
+            "format_string": "",
+            "description": "Clusters per size:",
+            "help_text": (
+                "How many clusters of each size to extract from the current "
+                "configuration. Fewer are produced if the configuration does not "
+                "contain enough distinct connected clusters, or if stratification "
+                "quotas cannot fill."
+            ),
+        },
+        # ------------------------------------------------------------------ #
+        # The contact graph
+        # ------------------------------------------------------------------ #
+        "contact cutoff": {
+            "default": 3.5,
+            "kind": "float",
+            "default_units": "Å",
+            "enumeration": tuple(),
+            "format_string": ".2f",
+            "description": "Contact cutoff:",
+            "help_text": (
+                "Two molecules are in contact if any of their contact atoms are "
+                "within this distance (minimum image). A cluster is a connected "
+                "set of molecules under this criterion. 3.5 Å between oxygens is "
+                "the usual hydrogen-bond criterion for water."
+            ),
+        },
+        "contact elements": {
+            "default": "all",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": ("all",),
+            "format_string": "",
+            "description": "Contact elements:",
+            "help_text": (
+                "The elements whose atoms define contact, e.g. 'O' or 'O, N'. "
+                "'all' uses every atom. Restricting to the heavy atoms that form "
+                "the intermolecular contacts (e.g. O for water) makes the cutoff "
+                "meaningful and the graph cheaper to build."
+            ),
+        },
+        # ------------------------------------------------------------------ #
+        # Stratification
+        # ------------------------------------------------------------------ #
+        "spread metric": {
+            "default": "radius of gyration",
+            "kind": "enum",
+            "default_units": "",
+            "enumeration": ("radius of gyration", "maximum centroid distance"),
+            "format_string": "",
+            "description": "Spread metric:",
+            "help_text": (
+                "The compactness coordinate of a cluster, computed from the "
+                "molecular centroids: the radius of gyration, or the largest "
+                "centroid-centroid distance. Used for stratification and stored "
+                "on each cluster."
+            ),
+        },
+        "stratification": {
+            "default": "quantile bins",
+            "kind": "enum",
+            "default_units": "",
+            "enumeration": ("none", "quantile bins", "explicit bin edges"),
+            "format_string": "",
+            "description": "Stratify by spread:",
+            "help_text": (
+                "Whether to accept clusters so that the set is flat in the spread "
+                "metric. 'quantile bins' places the bin edges at equal quantiles "
+                "of a pilot sample of the frame, so the bins adapt to the cluster "
+                "size and system; 'explicit bin edges' uses the edges given below; "
+                "'none' accepts clusters as sampled (biased towards the compact "
+                "clusters that dominate the liquid)."
+            ),
+        },
+        "number of bins": {
+            "default": 3,
+            "kind": "integer",
+            "default_units": "",
+            "enumeration": tuple(),
+            "format_string": "",
+            "description": "Number of bins:",
+            "help_text": (
+                "The number of equal-quantile bins of the spread metric. The "
+                "clusters are accepted so that the bins fill roughly evenly."
+            ),
+        },
+        "bin edges": {
+            "default": "",
+            "kind": "string",
+            "default_units": "Å",
+            "enumeration": tuple(),
+            "format_string": "",
+            "description": "Bin edges:",
+            "help_text": (
+                "The bin edges of the spread metric, in Å, as an increasing comma- "
+                "or space-separated list, e.g. '1.6, 2.0, 2.5, 3.5'. Clusters "
+                "outside the outer edges are rejected. Note that sensible edges "
+                "depend strongly on the cluster size and the system; 'quantile "
+                "bins' is usually the better choice."
+            ),
+        },
+        "balance motifs": {
+            "default": "no",
+            "kind": "boolean",
+            "default_units": "",
+            "enumeration": ("yes", "no"),
+            "format_string": "",
+            "description": "Balance motifs:",
+            "help_text": (
+                "Also balance the set over the topology of the contact graph "
+                "within the cluster (chain / ring / star / ..., or the number of "
+                "contacts for clusters of more than four molecules), jointly with "
+                "the spread bins. Topology and spread are correlated -- rings only "
+                "exist compact -- so some cells cannot fill and the set will "
+                "come up short of the requested number; the summary shows which."
+            ),
+        },
+        # ------------------------------------------------------------------ #
+        # Sampling
+        # ------------------------------------------------------------------ #
+        "random seed": {
+            "default": "random",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": ("random",),
+            "format_string": "",
+            "description": "Random seed:",
+            "help_text": (
+                "The seed for the random-number generator. Use 'random' for a "
+                "fresh, non-reproducible seed, or an integer for a reproducible "
+                "selection."
+            ),
+        },
+        "attempts per cluster": {
+            "default": 50,
+            "kind": "integer",
+            "default_units": "",
+            "enumeration": tuple(),
+            "format_string": "",
+            "description": "Attempts per cluster:",
+            "help_text": (
+                "The sampling budget: the total number of attempts is this times "
+                "the number of clusters requested. Attempts that duplicate an "
+                "earlier cluster, fall outside the bin edges, or land in a full "
+                "quota cell are rejected and count against the budget."
+            ),
+        },
+        # ------------------------------------------------------------------ #
+        # Output
+        # ------------------------------------------------------------------ #
+        "system name": {
+            "default": "from source",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": ("from source",),
+            "format_string": "",
+            "description": "Name the cluster system:",
+            "help_text": (
+                "The name of the system that receives the clusters, created if it "
+                "does not exist. 'from source' uses '<source system> clusters'. "
+                "Extracting from several frames into the same system accumulates "
+                "the clusters there, provided the configuration name prefix "
+                "differs between frames."
+            ),
+        },
+        "name prefix": {
+            "default": "from configuration",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": ("from configuration", "none"),
+            "format_string": "",
+            "description": "Configuration name prefix:",
+            "help_text": (
+                "Each cluster is named '<prefix><seed>_<m1-m2-...>' from the "
+                "source molecules, which is unique within a frame. The prefix "
+                "keeps the names unique across frames: 'from configuration' uses "
+                "'<source configuration name>_'; 'none' uses no prefix; any other "
+                "text is used literally (a variable such as '$frame_' works)."
+            ),
+        },
+        "store properties": {
+            "default": "yes",
+            "kind": "boolean",
+            "default_units": "",
+            "enumeration": ("yes", "no"),
+            "format_string": "",
+            "description": "Store descriptors as properties:",
+            "help_text": (
+                "Store the cluster size, spread, motif, number of contacts and "
+                "source molecules on each configuration as '#ExtractClusters#scan' "
+                "properties. They are carried through SDF/extxyz output."
+            ),
+        },
+        "make current": {
+            "default": "yes",
+            "kind": "boolean",
+            "default_units": "",
+            "enumeration": ("yes", "no"),
+            "format_string": "",
+            "description": "Make the cluster system current:",
+            "help_text": (
+                "Whether to make the cluster system (and its first configuration) "
+                "the current one, so that a following Write Structure step writes "
+                "the clusters. Choose 'no' when the source frame must remain "
+                "current, e.g. inside a loop that reads frames into it."
+            ),
         },
     }
 

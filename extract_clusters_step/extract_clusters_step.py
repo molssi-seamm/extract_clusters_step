@@ -28,8 +28,13 @@ class ExtractClustersStep(object):
     """
 
     my_description = {
-        "description": "An interface for Extract Clusters",
-        "group": "Simulations",
+        "description": (
+            "Extract molecular clusters (trimers, tetramers, ... larger n-mers) "
+            "from a condensed-phase, typically periodic, configuration as "
+            "unwrapped, non-periodic structures, e.g. for many-body training data "
+            "and diagnostics for machine-learned force fields."
+        ),
+        "group": "Building",
         "name": "Extract Clusters",
     }
 

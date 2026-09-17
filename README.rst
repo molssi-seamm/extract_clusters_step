@@ -30,7 +30,10 @@ SEAMM Extract Clusters Plug-in
    :target: https://pypi.python.org/pypi/extract_clusters_step
    :alt: PyPi VERSION
 
-A SEAMM plug-in for A SEAMM plug-in for extracting molecular clusters from a periodic cell of molecules
+A SEAMM plug-in for extracting molecular clusters (trimers, tetramers, ... larger
+n-mers) from a condensed-phase, typically periodic, configuration as unwrapped,
+non-periodic structures -- e.g. many-body training data and diagnostics for
+machine-learned force fields.
 
 * Free software: BSD-3-Clause
 * Documentation: https://molssi-seamm.github.io/extract_clusters_step/index.html
@@ -39,7 +42,22 @@ A SEAMM plug-in for A SEAMM plug-in for extracting molecular clusters from a per
 Features
 --------
 
-* Please edit this section!
+* Clusters are **connected subgraphs of a molecular contact graph** (molecules
+  are in contact if their contact atoms are within a cutoff, minimum image), so
+  chains, rings and stars all occur -- not just the most compact cluster.
+* Any cluster size, and several sizes per frame (e.g. ``3, 4``).
+* **Stratification** so the set is flat in a spread coordinate (radius of
+  gyration or largest centroid separation), with bin edges from equal quantiles
+  of a pilot sample or given explicitly; optional balancing over the
+  contact-graph motif.
+* Clusters are unwrapped across the periodic boundary, centred, non-periodic,
+  with molecules and bonds intact.
+* Provenance on every configuration: unique names
+  ``<frame>_<seed>_<m1-m2-...>`` and ``#ExtractClusters#scan`` properties (size,
+  spread, motif, contacts, source molecules) that survive SDF/extxyz export;
+  a ``clusters.csv`` summary per step.
+* Works on any cell (orthorhombic fast path via a periodic KD-tree; exact
+  minimum image otherwise) and on non-periodic sources.
 
 Acknowledgements
 ----------------

@@ -1,0 +1,8 @@
+Property,Type,Units,Description,URL
+cluster size#ExtractClusters#scan,int,,The number of molecules in the extracted cluster,
+spread rg#ExtractClusters#scan,float,Å,The radius of gyration of the molecular centroids of the cluster,
+spread dmax#ExtractClusters#scan,float,Å,The largest centroid-centroid distance within the cluster,
+n edges#ExtractClusters#scan,int,,The number of molecule-molecule contacts (edges of the contact graph) within the cluster,
+motif#ExtractClusters#scan,str,,The topology of the cluster's contact graph (chain / ring / star / paw / diamond / K4 or e<edges> for larger clusters),
+spread bin#ExtractClusters#scan,int,,The stratification bin (0-based) of the spread coordinate this cluster was accepted into,
+source molecules#ExtractClusters#scan,str,,The indices of the molecules in the source configuration making up the cluster (hyphen separated),
