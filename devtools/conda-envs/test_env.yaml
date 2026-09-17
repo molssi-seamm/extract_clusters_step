@@ -10,6 +10,8 @@ dependencies:
 
   # SEAMM
   - seamm
+  # seamm.Node still uses the bibtexparser 1.x API (loads)
+  - bibtexparser<2
   - molsystem
   - numpy
   - scipy
