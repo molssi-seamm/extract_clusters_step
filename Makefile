@@ -1,6 +1,6 @@
 MODULE := extract_clusters_step
 .PHONY: help clean clean-build clean-pyc clean-test lint format typing test dependencies
-.PHONY: test-all coverage html docs servedocs release check-release dist install uninstall
+.PHONY: test-all coverage html docs servedocs release check-release dist install uninstall update
 .DEFAULT_GOAL := help
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
@@ -95,3 +95,11 @@ install: uninstall ## install the package to the active Python's site-packages
 
 uninstall: clean ## uninstall the package
 	pip uninstall --yes $(MODULE)
+
+update: ## post-release: sync main and dev, reinstall, run checks, push dev
+	git checkout main
+	git pull
+	git checkout dev
+	git merge --ff-only main
+	$(MAKE) lint install test
+	git push
