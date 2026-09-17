@@ -71,7 +71,6 @@ Random seed
     ``random`` or an integer for a reproducible selection.
 Attempts per cluster
     The sampling budget: total attempts = this × clusters requested.
-Name the cluster system, Configuration name prefix, Store descriptors as
-properties, Make the cluster system current
+Name the cluster system, Configuration name prefix, Store descriptors as properties, Make the cluster system current
     See *Output* above. Choose *no* for *Make current* when the source frame
     must stay current, e.g. inside a loop that reads frames into it.
