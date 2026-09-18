@@ -142,9 +142,10 @@ class ExtractClusters(seamm.Node):
 
         sizes = str(P["cluster sizes"]).strip()
         plural = "s" if ("," in sizes or " " in sizes) else ""
-        text = (
-            f"Extract {P['number of clusters']} clusters of {sizes} molecule{plural}"
-            " each from the current configuration. Molecules are in contact if "
+        text = seamm.standard_parameters.structure_selection_description(P)
+        text += (
+            f" From each, extract {P['number of clusters']} clusters of {sizes} "
+            f"molecule{plural} each. Molecules are in contact if "
             f"their contact atoms ({P['contact elements']}) are within "
             f"{P['contact cutoff']}, and a cluster is a connected set of "
             "molecules under that criterion, sampled by random growth from a "
@@ -231,11 +232,12 @@ class ExtractClusters(seamm.Node):
         directory = Path(self.directory)
         directory.mkdir(parents=True, exist_ok=True)
 
-        # The source: the current system and configuration
+        # The sources: the selected configurations (frames)
         system_db = self.get_variable("_system_db")
-        system, configuration = self.get_system_configuration(None)
-        if configuration is None or configuration.n_atoms == 0:
-            raise RuntimeError("Extract Clusters: there is no current structure.")
+        sources = [c for c in self.select_configurations(P) if c.n_atoms > 0]
+        if len(sources) == 0:
+            raise RuntimeError("Extract Clusters: the selected structures are empty.")
+        system = sources[0].system
 
         # Parse the control parameters (run-time backstop for the GUI checks)
         sizes = self._parse_sizes(P["cluster sizes"])
@@ -281,34 +283,40 @@ class ExtractClusters(seamm.Node):
         else:
             new_system = system_db.create_system(name=system_name, make_current=False)
 
-        prefix = str(P["name prefix"])
-        if prefix == "from configuration":
-            prefix = f"{configuration.name}_"
-        elif prefix == "none":
-            prefix = ""
+        prefix_choice = str(P["name prefix"])
 
-        # Extract each size, sharing the 'seen' set so nothing is duplicated
-        results = []
-        seen = set()
-        for n in sizes:
-            configurations, records, info = extract_nmers(
-                configuration,
-                n,
-                n_samples,
-                cutoff=cutoff,
-                contact_elements=contact_elements,
-                spread_metric=spread_metric,
-                spread_bins=spread_bins,
-                balance_motifs=balance_motifs,
-                motifs=motifs,
-                system=new_system,
-                name_prefix=prefix,
-                max_attempts=attempts * n_samples,
-                rng=rng,
-                store_properties=store_properties,
-                seen=seen,
-            )
-            results.append((n, configurations, records, info))
+        # Extract from each frame, each size. One random stream over the whole
+        # run (so the seed reproduces everything); the duplicate check is per
+        # frame, since the same molecules in different frames are different
+        # geometries.
+        results = []  # (frame, configuration, n, clusters, records, info)
+        for frame, configuration in enumerate(sources):
+            if prefix_choice == "from configuration":
+                prefix = f"{configuration.name}_"
+            elif prefix_choice == "none":
+                prefix = ""
+            else:
+                prefix = prefix_choice
+            seen = set()
+            for n in sizes:
+                configurations, records, info = extract_nmers(
+                    configuration,
+                    n,
+                    n_samples,
+                    cutoff=cutoff,
+                    contact_elements=contact_elements,
+                    spread_metric=spread_metric,
+                    spread_bins=spread_bins,
+                    balance_motifs=balance_motifs,
+                    motifs=motifs,
+                    system=new_system,
+                    name_prefix=prefix,
+                    max_attempts=attempts * n_samples,
+                    rng=rng,
+                    store_properties=store_properties,
+                    seen=seen,
+                )
+                results.append((frame, configuration, n, configurations, records, info))
 
         # Record the descriptors for later analysis, and the provenance needed
         # to reproduce the run
@@ -318,8 +326,7 @@ class ExtractClusters(seamm.Node):
             seed=seed_used,
             sizes=sizes,
             n_requested=n_samples,
-            source_system=system.name,
-            source_configuration=configuration.name,
+            sources=[(c.system.name, c.name) for c in sources],
             destination_system=new_system.name,
             motifs=motifs,
             results=results,
@@ -334,7 +341,7 @@ class ExtractClusters(seamm.Node):
             P=P,
             results=results,
             system=new_system,
-            source=configuration,
+            sources=sources,
             seed=seed_used,
             motifs=motifs,
         )
@@ -347,7 +354,7 @@ class ExtractClusters(seamm.Node):
         P=None,
         results=None,
         system=None,
-        source=None,
+        sources=None,
         seed=None,
         motifs=None,
         **kwargs,
@@ -381,18 +388,35 @@ class ExtractClusters(seamm.Node):
             printer.important("")
 
         metric = P["spread metric"] if P is not None else "spread"
+        n_frames = len(sources) if sources is not None else 1
+        sizes = sorted({n for _, _, n, _, _, _ in results})
+
+        # Per size, aggregated over the frames. The bins are quantiles of each
+        # frame's own pilot sample, so a bin index means compact/mid/wide within
+        # its frame; the edges are printed only for a single frame.
         total = 0
-        for n, configurations, records, info in results:
-            total += len(configurations)
+        for n in sizes:
+            rows = [r for r in results if r[2] == n]
+            clusters = [c for _, _, _, cs, _, _ in rows for c in cs]
+            records = [r for _, _, _, _, rs, _ in rows for r in rs]
+            total += len(clusters)
+            attempts = sum(info["attempts"] for _, _, _, _, _, info in rows)
             text = (
-                f"{n}-mers: extracted {len(configurations)} clusters in "
-                f"{info['attempts']} attempts from {info['n_molecules']} molecules "
-                f"with {info['n_contacts']} contacts."
+                f"{n}-mers: extracted {len(clusters)} clusters in {attempts} attempts"
             )
+            if n_frames == 1:
+                info = rows[0][5]
+                text += (
+                    f" from {info['n_molecules']} molecules with "
+                    f"{info['n_contacts']} contacts."
+                )
+            else:
+                text += f" from {n_frames} frames."
             if motifs is not None:
+                rejected = sum(info["rejected_motif"] for _, _, _, _, _, info in rows)
                 text += (
                     f" Restricted to the motif(s) {', '.join(sorted(motifs))}; "
-                    f"{info['rejected_motif']} candidates rejected for their motif."
+                    f"{rejected} candidates rejected for their motif."
                 )
             if records:
                 rg = [r["rg"] for r in records]
@@ -406,21 +430,42 @@ class ExtractClusters(seamm.Node):
                 printer.important("")
                 printer.important(
                     __(
-                        f"Clusters by motif and {metric} bin:",
+                        f"Clusters by motif and {metric} bin"
+                        + (" (bins are per frame):" if n_frames > 1 else ":"),
                         indent=8 * " ",
                         wrap=False,
                     )
                 )
-                table = cluster_summary(records, edges=info["edges"])
+                edges = rows[0][5]["edges"] if n_frames == 1 else None
+                table = cluster_summary(records, edges=edges)
                 for line in table.splitlines():
                     printer.important(
                         __(line, indent=12 * " ", wrap=False, dedent=False)
                     )
-            if info["warning"] is not None:
-                printer.important("")
-                printer.important(
-                    __("Warning: " + info["warning"], indent=8 * " ", wrap=True)
+            for frame, configuration, _, _, _, info in rows:
+                if info["warning"] is not None:
+                    printer.important("")
+                    where = f" ({configuration.name})" if n_frames > 1 else ""
+                    printer.important(
+                        __(
+                            f"Warning{where}: " + info["warning"],
+                            indent=8 * " ",
+                            wrap=True,
+                        )
+                    )
+            printer.important("")
+
+        if n_frames > 1:
+            printer.important(__("Clusters per frame:", indent=4 * " ", wrap=False))
+            width = max(len(c.name) for c in sources)
+            header = f"{'frame':<{width}}" + "".join(f"{n:>8}-mer" for n in sizes)
+            printer.important(__(header, indent=8 * " ", wrap=False, dedent=False))
+            for frame, configuration in enumerate(sources):
+                counts = {n: len(cs) for f, _, n, cs, _, _ in results if f == frame}
+                line = f"{configuration.name:<{width}}" + "".join(
+                    f"{counts.get(n, 0):>12}" for n in sizes
                 )
+                printer.important(__(line, indent=8 * " ", wrap=False, dedent=False))
             printer.important("")
 
         if system is not None:
@@ -429,11 +474,19 @@ class ExtractClusters(seamm.Node):
                 f"'{system.name}', which now has {system.n_configurations} "
                 "configurations."
             )
-            if source is not None:
-                text += (
-                    f" The source was configuration '{source.name}' of system "
-                    f"'{source.system.name}'."
-                )
+            if sources is not None:
+                if n_frames == 1:
+                    text += (
+                        f" The source was configuration '{sources[0].name}' of "
+                        f"system '{sources[0].system.name}'."
+                    )
+                else:
+                    systems = sorted({c.system.name for c in sources})
+                    text += (
+                        f" The sources were {n_frames} configurations of "
+                        f"{'system' if len(systems) == 1 else 'systems'} "
+                        f"'{', '.join(systems)}'."
+                    )
             printer.important(__(text, indent=4 * " "))
         printer.important(
             __(
@@ -566,14 +619,32 @@ class ExtractClusters(seamm.Node):
         summary = dict(provenance)
         summary["motifs"] = provenance.get("motifs")
         summary["clusters"] = {}
-        for n, configurations, records, info in results:
+        summary["frames"] = []
+        for n in sorted({r[2] for r in results}):
+            rows = [r for r in results if r[2] == n]
+            records = [rec for _, _, _, _, rs, _ in rows for rec in rs]
             summary["clusters"][str(n)] = dict(
-                n_extracted=len(configurations),
-                attempts=info["attempts"],
-                bin_edges=info["edges"],
-                rejected_motif=info["rejected_motif"],
+                n_extracted=sum(len(cs) for _, _, _, cs, _, _ in rows),
+                attempts=sum(info["attempts"] for _, _, _, _, _, info in rows),
+                rejected_motif=sum(
+                    info["rejected_motif"] for _, _, _, _, _, info in rows
+                ),
                 by_motif=dict(Counter(r["motif"] for r in records)),
-                warning=info["warning"],
+            )
+        for frame, configuration, n, configurations, records, info in results:
+            summary["frames"].append(
+                dict(
+                    frame=frame,
+                    system=configuration.system.name,
+                    configuration=configuration.name,
+                    size=n,
+                    n_extracted=len(configurations),
+                    attempts=info["attempts"],
+                    bin_edges=info["edges"],
+                    rejected_motif=info["rejected_motif"],
+                    by_motif=dict(Counter(r["motif"] for r in records)),
+                    warning=info["warning"],
+                )
             )
         with open(path, "w") as fd:
             json.dump(summary, fd, indent=2)
@@ -582,6 +653,8 @@ class ExtractClusters(seamm.Node):
     def _write_csv(path, results):
         """Write one row per cluster with its descriptors."""
         fields = [
+            "system",
+            "frame",
             "name",
             "size",
             "motif",
@@ -596,10 +669,12 @@ class ExtractClusters(seamm.Node):
         with open(path, "w", newline="") as fd:
             writer = csv.writer(fd)
             writer.writerow(fields)
-            for n, configurations, records, info in results:
+            for frame, configuration, n, configurations, records, info in results:
                 for r in records:
                     writer.writerow(
                         [
+                            configuration.system.name,
+                            configuration.name,
                             r["name"],
                             r["n"],
                             r["motif"],

@@ -10,6 +10,19 @@ configurations in a new system. Its main use is generating many-body
 force fields, where a dimer-only training set cannot capture cooperative
 interactions.
 
+Which structures
+----------------
+
+The step works on the structures chosen in the *Structures to extract from*
+block, the standard SEAMM selection: the current configuration (the default),
+all or the last or first configurations of the current system, of all systems,
+or of the systems whose name is / matches / matches a regular expression; or a
+variable holding a list of configurations. Selecting *all* configurations of a
+system that holds a trajectory extracts from every frame in one step, so no
+loop is needed and all the clusters land in one system, ready for a single
+Write Structure. Each frame's clusters are named with that frame's
+configuration name as the prefix, and ``clusters.csv`` records the frame.
+
 How clusters are chosen
 -----------------------
 
@@ -67,10 +80,12 @@ the properties.
 Parameters
 ----------
 
+Systems, Configurations
+    Which structures to extract from; see *Which structures* above.
 Cluster sizes (molecules)
     One or more sizes, e.g. ``3`` or ``3, 4``; each at least 2.
 Clusters per size
-    How many of each size to extract from the frame.
+    How many of each size to extract from each selected frame.
 Contact cutoff, Contact elements
     Define the contact graph. 3.5 Å between oxygens is the usual hydrogen-bond
     criterion for water.
@@ -84,5 +99,5 @@ Random seed
 Attempts per cluster
     The sampling budget: total attempts = this × clusters requested.
 Name the cluster system, Configuration name prefix, Store descriptors as properties, Make the cluster system current
-    See *Output* above. Choose *no* for *Make current* when the source frame
-    must stay current, e.g. inside a loop that reads frames into it.
+    See *Output* above. Choose *no* for *Make current* when the source must
+    stay current.
