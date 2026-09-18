@@ -1,6 +1,12 @@
 =======
 History
 =======
+2026.9.18.2 -- Bugfix: the dialog failed to open
+    * Opening the step's dialog failed with "'LabeledCombobox' object has no
+      attribute 'entry'": the binding that updates the motif list when the cluster
+      sizes change assumed the wrong kind of widget. Fixed, and the dialog is now
+      exercised by a test.
+
 2026.9.18.1 -- Extract from many structures in one step
     * The step now takes the standard SEAMM structure selection: the current
       configuration (the default, as before), all or the last or first

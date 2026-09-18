@@ -179,8 +179,10 @@ class TkExtractClusters(seamm.TkNode):
             self[key].combobox.bind("<Return>", self.reset_dialog)
             self[key].combobox.bind("<FocusOut>", self.reset_dialog)
         # The cluster sizes decide which motifs exist.
-        self["cluster sizes"].entry.bind("<Return>", self.reset_dialog)
-        self["cluster sizes"].entry.bind("<FocusOut>", self.reset_dialog)
+        w = self["cluster sizes"]
+        field = w.combobox if hasattr(w, "combobox") else w.entry
+        field.bind("<Return>", self.reset_dialog)
+        field.bind("<FocusOut>", self.reset_dialog)
 
         # and lay them out
         self.reset_dialog()
