@@ -1,6 +1,6 @@
-=======================================================
+=========================================================
 2026-09-18: Reproducibility, motif selection, many frames
-=======================================================
+=========================================================
 
 Three enhancements requested after the first real use of the step on the
 3333-water NVT trajectory (Job 4800), planned together and delivered in two
