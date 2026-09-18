@@ -73,6 +73,21 @@ def classify_motif(n, n_edges, degrees):
     return f"e{n_edges}"
 
 
+def motif_names(n):
+    """The motif labels :func:`classify_motif` can produce for n molecules.
+
+    Named motifs for n <= 4; for larger n the labels are ``e<edges>`` for every
+    possible edge count of a connected graph, from n-1 (a tree) to n(n-1)/2.
+    """
+    if n == 2:
+        return ["dimer"]
+    if n == 3:
+        return ["chain", "ring"]
+    if n == 4:
+        return ["chain", "star", "ring", "paw", "diamond", "K4"]
+    return [f"e{k}" for k in range(n - 1, n * (n - 1) // 2 + 1)]
+
+
 def molecule_neighbour_graph(
     frac_atoms, atom_mol, contact_mask, T, cutoff, periodic, cell_parameters
 ):
@@ -209,18 +224,39 @@ def _spreads(cen):
     return rg, dmax
 
 
+def cluster_motif(adj, order):
+    """The motif label, edge count and degree list of the cluster ``order``."""
+    inside = set(order)
+    sub_edges = [(i, j) for i in order for j in adj.get(i, ()) if j in inside and i < j]
+    deg = Counter()
+    for i, j in sub_edges:
+        deg[i] += 1
+        deg[j] += 1
+    degrees = sorted((deg[m] for m in order), reverse=True)
+    return classify_motif(len(order), len(sub_edges), degrees), len(sub_edges), degrees
+
+
 def pilot_spreads(
-    adj, n, frac_centroids, T, periodic, spread_metric, n_mol, rng, n_pilot
+    adj, n, frac_centroids, T, periodic, spread_metric, n_mol, rng, n_pilot, motifs=None
 ):
-    """Spread values of an unstratified pilot sample, used to place bin edges."""
+    """Spread values of an unstratified pilot sample, used to place bin edges.
+
+    If ``motifs`` is given only clusters with those motifs are sampled, so the
+    bin edges describe the distribution the extraction will actually draw from
+    (ring trimers, say, are compact and never reach the widest all-motif bin).
+    """
     out = []
     tries = 0
-    while len(out) < n_pilot and tries < 20 * n_pilot:
+    # A motif restriction can reject most candidates, so allow many more tries.
+    max_tries = (200 if motifs is not None else 20) * n_pilot
+    while len(out) < n_pilot and tries < max_tries:
         tries += 1
         g = grow_connected(adj, int(rng.integers(n_mol)), n, rng)
         if g is None:
             continue
         order, parent = g
+        if motifs is not None and cluster_motif(adj, order)[0] not in motifs:
+            continue
         shifts = unwrap_shifts(order, parent, frac_centroids, periodic)
         cen = np.array([(frac_centroids[m] + shifts[m]) @ T for m in order])
         rg, dmax = _spreads(cen)
@@ -315,6 +351,7 @@ def extract_nmers(
     spread_metric="rg",
     spread_bins=None,
     balance_motifs=False,
+    motifs=None,
     system=None,
     system_name="clusters",
     name_prefix="",
@@ -360,6 +397,11 @@ def extract_nmers(
     balance_motifs : bool
         Also balance across contact-graph topology (chain/ring/star/...),
         jointly with the spread bins.
+    motifs : iterable of str or None
+        Accept only clusters whose contact-graph motif is one of these (see
+        :func:`motif_names`); None accepts every motif. Rejected candidates
+        count against the attempt budget, so rare motifs (rings are a few
+        percent of water trimers) may need a larger budget.
     system : molsystem _System or None
         Destination system. If None, ``system_name`` is looked up in the
         configuration's database and created if needed.
@@ -444,6 +486,9 @@ def extract_nmers(
         raise ValueError(f"No molecular contacts within {cutoff} Å")
     n_contacts = sum(len(v) for v in adj.values()) // 2
 
+    if motifs is not None:
+        motifs = set(motifs)
+
     # Stratification bins -----------------------------------------------------
     if isinstance(spread_bins, (int, np.integer)):
         # Choose edges from the data: equal-quantile bins of the spread
@@ -459,11 +504,15 @@ def extract_nmers(
             n_mol,
             rng,
             n_pilot=max(200, 20 * n_bins_requested),
+            motifs=motifs,
         )
         if len(pilot) < 2 * n_bins_requested:
+            what = f"{n}-mers"
+            if motifs is not None:
+                what += f" with motif(s) {sorted(motifs)}"
             raise ValueError(
-                f"Too few {n}-mers found ({len(pilot)}) to choose "
-                f"{n_bins_requested} spread bins"
+                f"Too few {what} found ({len(pilot)}) to choose "
+                f"{n_bins_requested} spread bins; use fewer bins or no stratification"
             )
         edges = np.quantile(pilot, np.linspace(0.0, 1.0, n_bins_requested + 1))
         edges[0] -= 1e-9
@@ -497,6 +546,7 @@ def extract_nmers(
     records = []
     counts = Counter()
     attempts = 0
+    n_rejected_motif = 0
     while len(configurations) < n_samples and attempts < max_attempts:
         attempts += 1
         seed = int(rng.integers(n_mol))
@@ -513,17 +563,10 @@ def extract_nmers(
         rg, dmax = _spreads(cen)
         spread = rg if spread_metric == "rg" else dmax
 
-        inside = set(order)
-        sub_edges = [
-            (i, j) for i in order for j in adj.get(i, ()) if j in inside and i < j
-        ]
-        n_edges = len(sub_edges)
-        deg = Counter()
-        for i, j in sub_edges:
-            deg[i] += 1
-            deg[j] += 1
-        degrees = sorted((deg[m] for m in order), reverse=True)
-        motif = classify_motif(n, n_edges, degrees)
+        motif, n_edges, degrees = cluster_motif(adj, order)
+        if motifs is not None and motif not in motifs:
+            n_rejected_motif += 1
+            continue
 
         if edges is not None:
             b = int(np.digitize(spread, edges)) - 1
@@ -609,6 +652,11 @@ def extract_nmers(
             f"Produced {len(configurations)} of {n_samples} requested {n}-mers "
             f"after {attempts} attempts"
         )
+        if motifs is not None:
+            warning += (
+                f"; {n_rejected_motif} candidates were rejected for not being one of "
+                f"{sorted(motifs)}"
+            )
         if stratified:
             warning += (
                 f" (per-key quota {per_key}). Quotas for (motif, bin) cells that "
@@ -629,6 +677,7 @@ def extract_nmers(
         per_key=per_key,
         n_molecules=n_mol,
         n_contacts=n_contacts,
+        rejected_motif=n_rejected_motif,
         warning=warning,
     )
     return configurations, records, info

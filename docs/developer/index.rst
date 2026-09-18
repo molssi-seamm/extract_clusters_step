@@ -6,6 +6,7 @@ Developer Guide
    :maxdepth: 1
 
    campaigns/2026-09-17/index
+   campaigns/2026-09-18/index
    modules
    ../installation
    ../contributing

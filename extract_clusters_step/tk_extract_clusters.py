@@ -3,10 +3,12 @@
 """The graphical part of a Extract Clusters step"""
 
 import pprint  # noqa: F401
+import re
 import tkinter as tk
 import tkinter.ttk as ttk
 
 import extract_clusters_step  # noqa: F401
+from extract_clusters_step.cluster_sampling import motif_names
 import seamm
 from seamm_util import ureg, Q_, units_class  # noqa: F401
 import seamm_widgets as sw
@@ -149,6 +151,7 @@ class TkExtractClusters(seamm.TkNode):
             "stratification": "stratification frame",
             "number of bins": "stratification frame",
             "bin edges": "stratification frame",
+            "motifs": "stratification frame",
             "balance motifs": "stratification frame",
             "system name": "output frame",
             "name prefix": "output frame",
@@ -161,10 +164,13 @@ class TkExtractClusters(seamm.TkNode):
             self[key] = P[key].widget(self[parents[key]])
 
         # Comboboxes whose value changes the layout re-lay out the dialog.
-        for key in ("stratification",):
+        for key in ("stratification", "motifs"):
             self[key].combobox.bind("<<ComboboxSelected>>", self.reset_dialog)
             self[key].combobox.bind("<Return>", self.reset_dialog)
             self[key].combobox.bind("<FocusOut>", self.reset_dialog)
+        # The cluster sizes decide which motifs exist.
+        self["cluster sizes"].entry.bind("<Return>", self.reset_dialog)
+        self["cluster sizes"].entry.bind("<FocusOut>", self.reset_dialog)
 
         # and lay them out
         self.reset_dialog()
@@ -232,7 +238,24 @@ class TkExtractClusters(seamm.TkNode):
             keys.append("number of bins")
         elif strat == "explicit bin edges":
             keys.append("bin edges")
-        keys.append("balance motifs")
+
+        # Offer only the motifs the requested cluster sizes can produce (a
+        # typed $variable or unparsable sizes fall back to the n = 3, 4 names).
+        sizes = []
+        for token in re.split(r"[,\s]+", self["cluster sizes"].get().strip()):
+            if token.isdigit() and int(token) >= 2:
+                sizes.append(int(token))
+        if not sizes:
+            sizes = [3, 4]
+        names = ["any"]
+        for n in sizes:
+            names += [m for m in motif_names(n) if m not in names]
+        self["motifs"].combobox.config(values=names)
+        motifs = [t for t in re.split(r"[,\s]+", self["motifs"].get().strip()) if t]
+        keys.append("motifs")
+        # A single motif leaves nothing to balance over, so hide the option.
+        if not (len(motifs) == 1 and motifs[0].lower() != "any"):
+            keys.append("balance motifs")
         widgets = []
         for i, key in enumerate(keys):
             self[key].grid(row=i, column=0, sticky=tk.EW)

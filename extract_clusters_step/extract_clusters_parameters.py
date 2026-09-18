@@ -147,6 +147,23 @@ class ExtractClustersParameters(seamm.Parameters):
                 "bins' is usually the better choice."
             ),
         },
+        "motifs": {
+            "default": "any",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": ("any",),
+            "format_string": "",
+            "description": "Restrict to motifs:",
+            "help_text": (
+                "Accept only clusters whose contact-graph topology is one of the "
+                "given motifs, e.g. 'ring', or 'ring, star' for several. 'any' "
+                "accepts all. Trimers have 'chain' and 'ring'; tetramers 'chain', "
+                "'star', 'ring', 'paw', 'diamond' and 'K4'; larger clusters are "
+                "labelled 'e<n>' by their number of contacts. Rare motifs use up "
+                "the attempt budget quickly, so raise 'Attempts per cluster' if "
+                "the set comes up short."
+            ),
+        },
         "balance motifs": {
             "default": "no",
             "kind": "boolean",
@@ -175,8 +192,9 @@ class ExtractClustersParameters(seamm.Parameters):
             "description": "Random seed:",
             "help_text": (
                 "The seed for the random-number generator. Use 'random' for a "
-                "fresh, non-reproducible seed, or an integer for a reproducible "
-                "selection."
+                "fresh seed, or an integer for a reproducible selection. The seed "
+                "actually used is always printed in the output, so a 'random' run "
+                "can be reproduced by entering that value here."
             ),
         },
         "attempts per cluster": {
