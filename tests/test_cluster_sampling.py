@@ -124,3 +124,22 @@ def test_classify_motif():
     assert classify_motif(4, 5, [3, 3, 2, 2]) == "diamond"
     assert classify_motif(4, 6, [3, 3, 3, 3]) == "K4"
     assert classify_motif(6, 7, [3, 3, 2, 2, 2, 2]) == "e7"
+
+
+def test_motif_names():
+    from extract_clusters_step.cluster_sampling import motif_names
+
+    assert motif_names(2) == ["dimer"]
+    assert motif_names(3) == ["chain", "ring"]
+    assert motif_names(4) == ["chain", "star", "ring", "paw", "diamond", "K4"]
+    assert motif_names(5) == ["e4", "e5", "e6", "e7", "e8", "e9", "e10"]
+    # every label classify_motif can produce for n=4 is in the list
+    for n_edges, degrees in (
+        (3, [3, 1, 1, 1]),
+        (3, [2, 2, 1, 1]),
+        (4, [2, 2, 2, 2]),
+        (4, [3, 2, 2, 1]),
+        (5, [3, 3, 2, 2]),
+        (6, [3, 3, 3, 3]),
+    ):
+        assert classify_motif(4, n_edges, degrees) in motif_names(4)

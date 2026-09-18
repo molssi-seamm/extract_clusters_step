@@ -36,6 +36,12 @@ metric (radius of gyration or largest centroid separation of the molecules)
 and then accepts clusters so that each bin fills equally. *Explicit bin edges*
 lets you give the edges instead; *none* accepts clusters as sampled.
 
+*Restrict to motifs* accepts only clusters with the given contact-graph topology,
+e.g. ``ring`` for cyclic trimers, or several such as ``ring, star``. The dialog
+offers the motifs the requested cluster sizes can produce. Rare motifs use up the
+attempt budget quickly, so raise *Attempts per cluster* if the set comes up short;
+the output reports how many candidates were rejected for their motif.
+
 *Balance motifs* also balances the set over the topology of the contact graph
 within the cluster. Topology and spread are correlated -- rings only exist
 compact -- so some (motif, bin) cells are physically empty and the set then
@@ -53,7 +59,8 @@ unique within a frame; the prefix (the source configuration name by default)
 keeps them unique across frames when a loop extracts from many frames into
 one system. The size, spread, motif, number of contacts, bin and source
 molecules are stored as ``#ExtractClusters#scan`` properties and written to
-``clusters.csv`` in the step directory. A following Write Structure step with
+``clusters.csv`` in the step directory; ``summary.json`` there records the seed,
+the source, the bin edges and the counts by motif. A following Write Structure step with
 *current system* writes all the clusters, e.g. as an SDF whose records carry
 the properties.
 
@@ -71,7 +78,9 @@ Spread metric, Stratify by spread, Number of bins / Bin edges, Balance motifs
     See *Stratification* above. Only the controls that apply to the chosen
     scheme are shown.
 Random seed
-    ``random`` or an integer for a reproducible selection.
+    ``random`` or an integer. The seed actually used is always printed in the
+    output and written to ``summary.json``, so a ``random`` run can be reproduced
+    by entering that value.
 Attempts per cluster
     The sampling budget: total attempts = this × clusters requested.
 Name the cluster system, Configuration name prefix, Store descriptors as properties, Make the cluster system current

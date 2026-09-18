@@ -2,12 +2,15 @@
 
 """Non-graphical part of the Extract Clusters step in a SEAMM flowchart"""
 
+from collections import Counter
 import csv
 import importlib.resources
+import json
 import logging
 from pathlib import Path
 import pprint  # noqa: F401
 import re
+import secrets
 
 import numpy as np
 
@@ -16,6 +19,7 @@ from extract_clusters_step.cluster_sampling import (
     PROPERTY_TAG,
     cluster_summary,
     extract_nmers,
+    motif_names,
 )
 import molsystem
 import seamm
@@ -162,6 +166,9 @@ class ExtractClusters(seamm.Node):
             )
         else:
             text += " The clusters are accepted as sampled, without stratification."
+        motifs = str(P["motifs"]).strip()
+        if motifs.lower() not in ("", "any"):
+            text += f" Only clusters with the motif(s) {motifs} will be accepted."
         if self._truthy(P["balance motifs"]):
             text += (
                 " The set will also be balanced over the topology of the contact "
@@ -170,7 +177,10 @@ class ExtractClusters(seamm.Node):
 
         seed = str(P["random seed"]).strip()
         if seed.lower() in ("", "random"):
-            text += " The random seed will be chosen at random."
+            text += (
+                " The random seed will be chosen at random and printed, so the run "
+                "can be reproduced."
+            )
         else:
             text += f" The random seed is {seed}."
 
@@ -251,8 +261,11 @@ class ExtractClusters(seamm.Node):
             spread_bins = None
         else:
             raise ValueError(f"Unknown stratification '{strat}'")
+        motifs = self._parse_motifs(P["motifs"], sizes)
         balance_motifs = self._truthy(P["balance motifs"])
-        rng = self._make_rng(P["random seed"])
+        if motifs is not None and len(motifs) == 1:
+            balance_motifs = False  # nothing to balance over
+        rng, seed_used = self._make_rng(P["random seed"])
         attempts = int(P["attempts per cluster"])
         if attempts < 1:
             raise ValueError("The attempts per cluster must be at least 1.")
@@ -287,6 +300,7 @@ class ExtractClusters(seamm.Node):
                 spread_metric=spread_metric,
                 spread_bins=spread_bins,
                 balance_motifs=balance_motifs,
+                motifs=motifs,
                 system=new_system,
                 name_prefix=prefix,
                 max_attempts=attempts * n_samples,
@@ -296,20 +310,47 @@ class ExtractClusters(seamm.Node):
             )
             results.append((n, configurations, records, info))
 
-        # Record the descriptors for later analysis
+        # Record the descriptors for later analysis, and the provenance needed
+        # to reproduce the run
         self._write_csv(directory / "clusters.csv", results)
+        self._write_summary(
+            directory / "summary.json",
+            seed=seed_used,
+            sizes=sizes,
+            n_requested=n_samples,
+            source_system=system.name,
+            source_configuration=configuration.name,
+            destination_system=new_system.name,
+            motifs=motifs,
+            results=results,
+        )
 
         # Make the new system & its first configuration current
         if self._truthy(P["make current"]) and new_system.n_configurations > 0:
             system_db.system = new_system
             new_system.configuration = new_system.configurations[0].id
 
-        self.analyze(P=P, results=results, system=new_system, source=configuration)
+        self.analyze(
+            P=P,
+            results=results,
+            system=new_system,
+            source=configuration,
+            seed=seed_used,
+            motifs=motifs,
+        )
 
         return next_node
 
     def analyze(
-        self, indent="", P=None, results=None, system=None, source=None, **kwargs
+        self,
+        indent="",
+        P=None,
+        results=None,
+        system=None,
+        source=None,
+        seed=None,
+        motifs=None,
+        **kwargs,
     ):
         """Report the extracted clusters to step.out.
 
@@ -329,6 +370,16 @@ class ExtractClusters(seamm.Node):
         if results is None:
             return
 
+        if seed is not None:
+            printer.important(
+                __(
+                    f"Random seed: {seed}. To reproduce this selection, set the "
+                    "random seed to this value.",
+                    indent=4 * " ",
+                )
+            )
+            printer.important("")
+
         metric = P["spread metric"] if P is not None else "spread"
         total = 0
         for n, configurations, records, info in results:
@@ -338,6 +389,11 @@ class ExtractClusters(seamm.Node):
                 f"{info['attempts']} attempts from {info['n_molecules']} molecules "
                 f"with {info['n_contacts']} contacts."
             )
+            if motifs is not None:
+                text += (
+                    f" Restricted to the motif(s) {', '.join(sorted(motifs))}; "
+                    f"{info['rejected_motif']} candidates rejected for their motif."
+                )
             if records:
                 rg = [r["rg"] for r in records]
                 dmax = [r["dmax"] for r in records]
@@ -460,12 +516,67 @@ class ExtractClusters(seamm.Node):
 
     @staticmethod
     def _make_rng(seed):
-        """A numpy random generator from the 'random seed' parameter."""
+        """A numpy random generator from the 'random seed' parameter.
+
+        Returns
+        -------
+        (numpy.random.Generator, int)
+            The generator and the integer seed it was built from. For 'random' a
+            fresh seed is drawn from the OS so it can be printed and reused.
+        """
         if isinstance(seed, str):
             if seed.strip() == "" or seed.strip().lower() == "random":
-                return np.random.default_rng()
-            seed = int(seed)
-        return np.random.default_rng(int(seed))
+                seed = secrets.randbits(32)
+            else:
+                seed = int(seed)
+        seed = int(seed)
+        return np.random.default_rng(seed), seed
+
+    @classmethod
+    def _parse_motifs(cls, text, sizes):
+        """The motif restriction: None for 'any', else a list of motif names.
+
+        Each name must be a motif that at least one of the requested cluster
+        sizes can produce.
+        """
+        if isinstance(text, str) and text.strip().lower() in ("", "any"):
+            return None
+        tokens = cls._split_list(text)
+        if not tokens or [t.lower() for t in tokens] == ["any"]:
+            return None
+        allowed = {}
+        for n in sizes:
+            for name in motif_names(n):
+                allowed.setdefault(name.lower(), name)
+        motifs = []
+        for t in tokens:
+            key = t.lower()
+            if key not in allowed:
+                raise ValueError(
+                    f"'{t}' is not a motif of a {', '.join(str(n) for n in sizes)}"
+                    f"-molecule cluster; choose from {sorted(allowed.values())}."
+                )
+            if allowed[key] not in motifs:
+                motifs.append(allowed[key])
+        return motifs
+
+    @staticmethod
+    def _write_summary(path, results, **provenance):
+        """Write a JSON summary: the seed and other provenance, and the counts."""
+        summary = dict(provenance)
+        summary["motifs"] = provenance.get("motifs")
+        summary["clusters"] = {}
+        for n, configurations, records, info in results:
+            summary["clusters"][str(n)] = dict(
+                n_extracted=len(configurations),
+                attempts=info["attempts"],
+                bin_edges=info["edges"],
+                rejected_motif=info["rejected_motif"],
+                by_motif=dict(Counter(r["motif"] for r in records)),
+                warning=info["warning"],
+            )
+        with open(path, "w") as fd:
+            json.dump(summary, fd, indent=2)
 
     @staticmethod
     def _write_csv(path, results):

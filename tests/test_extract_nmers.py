@@ -292,3 +292,130 @@ def test_bondless_rare_gas_is_allowed(db):
     confs, recs, info = extract_nmers(conf, 3, 5, cutoff=4.5, rng=2)
     assert len(confs) == 5
     assert all(c.n_atoms == 3 for c in confs)
+
+
+def test_motif_restriction(water_box):
+    """Only the requested motif is accepted; rejections are reported."""
+    confs, recs, info = extract_nmers(
+        water_box,
+        3,
+        8,
+        contact_elements=["O"],
+        motifs=["ring"],
+        rng=5,
+        max_attempts=2000,
+    )
+    assert len(confs) >= 1
+    assert {r["motif"] for r in recs} == {"ring"}
+    assert info["rejected_motif"] > 0
+    assert all(_prop(c, "motif") == "ring" for c in confs)
+    # several motifs at once
+    confs, recs, info = extract_nmers(
+        water_box,
+        4,
+        10,
+        contact_elements=["O"],
+        motifs=["ring", "star"],
+        rng=6,
+        max_attempts=3000,
+    )
+    assert {r["motif"] for r in recs} <= {"ring", "star"}
+    # a short fill names the motif rejections in the warning
+    confs, recs, info = extract_nmers(
+        water_box,
+        3,
+        500,
+        contact_elements=["O"],
+        motifs=["ring"],
+        rng=7,
+        max_attempts=300,
+    )
+    assert (
+        info["warning"] is not None
+        and "rejected for not being one of" in info["warning"]
+    )
+
+
+def test_node_seed_is_reported_and_reproducible(water_box, tmp_path, monkeypatch):
+    """A 'random' run records the seed it used, and that seed reproduces it."""
+    import json
+
+    import seamm
+
+    def make_node(directory):
+        node = extract_clusters_step.ExtractClusters()
+        node._id = (1,)
+        monkeypatch.setattr(
+            type(node), "directory", property(lambda self: str(directory))
+        )
+        monkeypatch.setattr(node, "get_variable", lambda name: db)
+        monkeypatch.setattr(
+            node,
+            "get_system_configuration",
+            lambda P=None: (water_box.system, water_box),
+        )
+        return node
+
+    db = water_box.system_db
+    monkeypatch.setattr(seamm.Node, "run", lambda self, printer=None: None)
+    if seamm.flowchart_variables is None:
+        monkeypatch.setattr(seamm, "flowchart_variables", seamm.Variables())
+
+    d1 = tmp_path / "run1"
+    d1.mkdir()
+    node = make_node(d1)
+    P = node.parameters
+    P["number of clusters"].value = 8
+    P["contact elements"].value = "O"
+    P["motifs"].value = "ring"
+    P["attempts per cluster"].value = 500
+    P["system name"].value = "first"
+    P["make current"].value = "no"
+    node.run()
+    summary = json.loads((d1 / "summary.json").read_text())
+    seed = summary["seed"]
+    assert isinstance(seed, int)
+    assert summary["motifs"] == ["ring"]
+    assert set(summary["clusters"]["3"]["by_motif"]) == {"ring"}
+    names1 = [c.name for c in db.get_systems("first")[0].configurations]
+
+    d2 = tmp_path / "run2"
+    d2.mkdir()
+    node = make_node(d2)
+    P = node.parameters
+    P["number of clusters"].value = 8
+    P["contact elements"].value = "O"
+    P["motifs"].value = "ring"
+    P["attempts per cluster"].value = 500
+    P["system name"].value = "second"
+    P["random seed"].value = str(seed)
+    P["make current"].value = "no"
+    node.run()
+    names2 = [c.name for c in db.get_systems("second")[0].configurations]
+    assert names1 == names2
+
+
+def test_motif_restriction_sets_bins_from_that_motif(water_box):
+    """With one motif, the quantile edges come from that motif, so all bins fill.
+
+    Stars are the compact tetramer motif that is common enough in the synthetic
+    box (rings are too rare there; the real liquid is checked by hand).
+    """
+    confs, recs, info = extract_nmers(
+        water_box,
+        4,
+        9,
+        contact_elements=["O"],
+        motifs=["star"],
+        spread_bins=3,
+        rng=8,
+        max_attempts=20000,
+    )
+    assert len(confs) == 9
+    assert {r["motif"] for r in recs} == {"star"}
+    assert [sum(1 for r in recs if r["bin"] == b) for b in range(3)] == [3, 3, 3]
+    # stars are more compact than chains: the top edge is below the all-motif one
+    _, _, info_all = extract_nmers(
+        water_box, 4, 9, contact_elements=["O"], spread_bins=3, rng=8, system_name="all"
+    )
+    assert info["edges"][-1] < info_all["edges"][-1]

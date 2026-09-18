@@ -72,7 +72,28 @@ def test_parse_edges():
 def test_make_rng():
     import numpy as np
 
-    r1 = ExtractClusters._make_rng("42").integers(1000)
-    r2 = ExtractClusters._make_rng(42).integers(1000)
+    r1 = ExtractClusters._make_rng("42")[0].integers(1000)
+    r2 = ExtractClusters._make_rng(42)[0].integers(1000)
     assert r1 == r2
-    assert isinstance(ExtractClusters._make_rng("random"), np.random.Generator)
+    assert isinstance(ExtractClusters._make_rng("random")[0], np.random.Generator)
+
+
+def test_parse_motifs():
+    assert ExtractClusters._parse_motifs("any", [3]) is None
+    assert ExtractClusters._parse_motifs("", [3]) is None
+    assert ExtractClusters._parse_motifs("ring", [3]) == ["ring"]
+    assert ExtractClusters._parse_motifs("Ring, STAR", [3, 4]) == ["ring", "star"]
+    assert ExtractClusters._parse_motifs("e7", [5]) == ["e7"]
+    with pytest.raises(ValueError):
+        ExtractClusters._parse_motifs("star", [3])  # no star trimer
+    with pytest.raises(ValueError):
+        ExtractClusters._parse_motifs("bogus", [3, 4])
+
+
+def test_make_rng_reports_seed():
+    rng, seed = ExtractClusters._make_rng("random")
+    assert isinstance(seed, int)
+    rng2, seed2 = ExtractClusters._make_rng(seed)
+    assert seed2 == seed
+    assert rng.integers(10**6) == rng2.integers(10**6)
+    assert ExtractClusters._make_rng("42")[1] == 42
