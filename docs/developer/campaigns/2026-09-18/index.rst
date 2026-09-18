@@ -57,13 +57,25 @@ variables and the current system:
 * then convert Loop (the reference semantics), Write Structure and the Dimer
   Builder one at a time, keeping flowchart parameter names backward compatible.
 
-Part B -- Extract Clusters uses the block. Per selected configuration the
+Part A was delivered in seamm 2026.9.18.1 (``structure_selection_parameters``,
+``select_configurations``, ``structure_selection_description``,
+``TkNode.create_structure_selection_widgets`` / ``layout_structure_selection``,
+developer-guide page "Selecting structures in a plug-in"). While reading the
+Loop step's selection code two bugs were noted for its conversion: it compares
+configuration names with ``is`` rather than ``==``, and it tests for
+``matches`` / ``regexp`` while its enumeration offers ``name matches`` /
+``name regexp``, so those choices fall through.
+
+Part B -- Extract Clusters uses the block (delivered in 2026.9.18.1). Per selected configuration the
 extraction runs with the configuration name as the prefix, sharing one
 destination system and one random stream so the printed seed reproduces the
 whole set; the dedupe set stays per frame (the same molecule indices in
 different frames are different geometries); ``clusters.csv`` gains a ``frame``
 column; the report gives one motif-by-bin table per size aggregated over frames
 plus a per-frame line.
+
+Verified on six frames of the Job 4800 trajectory read into one system: 60
+trimers and 60 tetramers in one step, 10 of each per frame, one SDF.
 
 Sequencing: Part A is a ``seamm`` release with tests against an in-memory
 database and a write-up of the selection semantics in the seamm developer

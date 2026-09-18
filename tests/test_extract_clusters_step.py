@@ -21,7 +21,8 @@ def test_description_text():
     node = extract_clusters_step.ExtractClusters()
     node._id = (1,)  # normally assigned by the flowchart; needed for the header
     text = " ".join(node.description_text().split())  # undo the line wrapping
-    assert "Extract 50 clusters of 3 molecule" in text
+    assert "The current configuration of the current system will be used." in text
+    assert "extract 50 clusters of 3 molecule" in text
     assert "equal-quantile bins" in text
     P = node.parameters.values_to_dict()
     P["cluster sizes"] = "3, 4"

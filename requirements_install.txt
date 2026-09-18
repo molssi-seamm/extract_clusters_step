@@ -1,7 +1,7 @@
 Pmw
-molsystem
+molsystem>=2026.9.17.2
 numpy
 scipy
-seamm
+seamm>=2026.9.18.1
 seamm-util
 seamm-widgets

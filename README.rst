@@ -46,6 +46,9 @@ Features
   are in contact if their contact atoms are within a cutoff, minimum image), so
   chains, rings and stars all occur -- not just the most compact cluster.
 * Any cluster size, and several sizes per frame (e.g. ``3, 4``).
+* Works on many frames in one step -- all configurations of a system holding a
+  trajectory, or any standard SEAMM structure selection -- so no loop is needed
+  and the clusters land in one system.
 * **Stratification** so the set is flat in a spread coordinate (radius of
   gyration or largest centroid separation), with bin edges from equal quantiles
   of a pilot sample or given explicitly; optional balancing over the

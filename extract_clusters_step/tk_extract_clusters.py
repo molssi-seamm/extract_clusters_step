@@ -116,6 +116,15 @@ class TkExtractClusters(seamm.TkNode):
         P = self.node.parameters
 
         # Group the widgets into labeled frames
+        self["input frame"] = ttk.LabelFrame(
+            frame,
+            borderwidth=4,
+            relief="sunken",
+            text="Structures to extract from",
+            labelanchor="n",
+            padding=10,
+        )
+        self.create_structure_selection_widgets(self["input frame"])
         self["clusters frame"] = ttk.LabelFrame(
             frame,
             borderwidth=4,
@@ -159,9 +168,10 @@ class TkExtractClusters(seamm.TkNode):
             "make current": "output frame",
         }
 
-        # Then create the widgets
+        # Then create the widgets (the selection block's were made above)
         for key in P:
-            self[key] = P[key].widget(self[parents[key]])
+            if key not in seamm.standard_parameters.structure_selection_parameters:
+                self[key] = P[key].widget(self[parents[key]])
 
         # Comboboxes whose value changes the layout re-lay out the dialog.
         for key in ("stratification", "motifs"):
@@ -200,13 +210,20 @@ class TkExtractClusters(seamm.TkNode):
         frame = self["frame"]
         for slave in frame.grid_slaves():
             slave.grid_forget()
-        for name in ("clusters frame", "stratification frame", "output frame"):
+        for name in (
+            "input frame",
+            "clusters frame",
+            "stratification frame",
+            "output frame",
+        ):
             for slave in self[name].grid_slaves():
                 slave.grid_forget()
 
         # keep track of the row in a variable, so that the layout is flexible
         # if e.g. rows are skipped to control such as "method" here
         row = 0
+        self["input frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
+        row += 1
         self["clusters frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
         row += 1
         self["stratification frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
@@ -214,6 +231,11 @@ class TkExtractClusters(seamm.TkNode):
         self["output frame"].grid(row=row, column=0, sticky=tk.EW, pady=5)
         row += 1
         frame.columnconfigure(0, weight=1)
+
+        # Which structures
+        _, widgets = self.layout_structure_selection(row=0)
+        sw.align_labels(widgets, sticky=tk.E)
+        self["input frame"].columnconfigure(1, weight=1)
 
         # The clusters
         widgets = []

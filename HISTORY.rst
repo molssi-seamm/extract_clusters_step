@@ -1,6 +1,19 @@
 =======
 History
 =======
+2026.9.18.1 -- Extract from many structures in one step
+    * The step now takes the standard SEAMM structure selection: the current
+      configuration (the default, as before), all or the last or first
+      configurations of the current system, of all systems, or of systems chosen
+      by name, or a variable holding a list of configurations. Selecting all the
+      configurations of a system that holds a trajectory extracts from every frame
+      in one step, with no loop, and puts all the clusters in one system. Each
+      frame's clusters are prefixed with its configuration name; ``clusters.csv``
+      and ``summary.json`` record the frame; the report aggregates over frames and
+      lists the count per frame. One random stream covers the whole run, so the
+      printed seed reproduces it.
+    * Requires seamm 2026.9.18.1 and molsystem 2026.9.17.2 or later.
+
 2026.9.18 -- Reproducible seeds and motif selection
     * The random seed actually used is now always printed and recorded in a new
       ``summary.json`` in the step directory (with the source, bin edges and counts

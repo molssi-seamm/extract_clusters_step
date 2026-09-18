@@ -419,3 +419,106 @@ def test_motif_restriction_sets_bins_from_that_motif(water_box):
         water_box, 4, 9, contact_elements=["O"], spread_bins=3, rng=8, system_name="all"
     )
     assert info["edges"][-1] < info_all["edges"][-1]
+
+
+def test_node_run_over_several_frames(water_box, tmp_path, monkeypatch):
+    """Selecting all configurations of the system extracts from every frame."""
+    import csv
+    import json
+
+    import seamm
+
+    db = water_box.system_db
+    system = water_box.system
+    # a second and third frame in the same system (shifted copies)
+    for name in ("frame1", "frame2"):
+        conf = system.copy_configuration(configuration=water_box, make_current=True)
+        conf.name = name
+        xyz = conf.atoms.get_coordinates(fractionals=False, as_array=True)
+        conf.atoms.set_coordinates(xyz + 0.3, fractionals=False)
+    assert system.n_configurations == 3
+
+    node = extract_clusters_step.ExtractClusters()
+    node._id = (1,)
+    monkeypatch.setattr(type(node), "directory", property(lambda self: str(tmp_path)))
+    monkeypatch.setattr(node, "get_variable", lambda name: db)
+    monkeypatch.setattr(seamm.Node, "run", lambda self, printer=None: None)
+    if seamm.flowchart_variables is None:
+        monkeypatch.setattr(seamm, "flowchart_variables", seamm.Variables())
+
+    P = node.parameters
+    P["source configurations"].value = "all"
+    P["cluster sizes"].value = "3, 4"
+    P["number of clusters"].value = 6
+    P["contact elements"].value = "O"
+    P["random seed"].value = "11"
+    P["make current"].value = "yes"
+    node.run()
+
+    clusters = db.get_systems("water box clusters")[0]
+    assert clusters.n_configurations == 3 * 2 * 6
+    names = [c.name for c in clusters.configurations]
+    assert len(set(names)) == len(names)
+    assert sum(1 for n in names if n.startswith("frame0_")) == 12
+    assert sum(1 for n in names if n.startswith("frame2_")) == 12
+    # the cluster system is now current
+    assert db.system.name == "water box clusters"
+
+    rows = list(csv.DictReader(open(tmp_path / "clusters.csv")))
+    assert len(rows) == 36
+    assert {r["frame"] for r in rows} == {"frame0", "frame1", "frame2"}
+    assert {r["system"] for r in rows} == {"water box"}
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    assert summary["seed"] == 11
+    assert len(summary["sources"]) == 3
+    assert summary["clusters"]["3"]["n_extracted"] == 18
+    assert len(summary["frames"]) == 6
+
+
+def test_node_selection_by_variable_and_name(water_box, tmp_path, monkeypatch):
+    """A name filter and a $variable of configurations both work as sources."""
+    import seamm
+
+    db = water_box.system_db
+    system = water_box.system
+    other = system.copy_configuration(configuration=water_box, make_current=False)
+    other.name = "other"
+
+    def make_node(sub):
+        d = tmp_path / sub
+        d.mkdir()
+        node = extract_clusters_step.ExtractClusters()
+        node._id = (1,)
+        monkeypatch.setattr(type(node), "directory", property(lambda self: str(d)))
+        monkeypatch.setattr(seamm.Node, "run", lambda self, printer=None: None)
+        return node
+
+    variables = seamm.Variables()
+    variables["_system_db"] = db
+    variables["frames"] = [other]
+    monkeypatch.setattr(seamm, "flowchart_variables", variables)
+
+    node = make_node("a")
+    monkeypatch.setattr(node, "get_variable", lambda name: variables[name])
+    P = node.parameters
+    P["source configurations"].value = "name is"
+    P["source configuration name"].value = "other"
+    P["number of clusters"].value = 4
+    P["contact elements"].value = "O"
+    P["system name"].value = "by name"
+    P["make current"].value = "no"
+    node.run()
+    names = [c.name for c in db.get_systems("by name")[0].configurations]
+    assert len(names) == 4 and all(n.startswith("other_") for n in names)
+
+    node = make_node("b")
+    monkeypatch.setattr(node, "get_variable", lambda name: variables[name])
+    P = node.parameters
+    P["source systems"].value = "$frames"
+    P["number of clusters"].value = 4
+    P["contact elements"].value = "O"
+    P["system name"].value = "by variable"
+    P["make current"].value = "no"
+    node.run()
+    names = [c.name for c in db.get_systems("by variable")[0].configurations]
+    assert len(names) == 4 and all(n.startswith("other_") for n in names)

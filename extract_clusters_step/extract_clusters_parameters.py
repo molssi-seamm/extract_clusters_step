@@ -27,6 +27,10 @@ class ExtractClustersParameters(seamm.Parameters):
 
     parameters = {
         # ------------------------------------------------------------------ #
+        # Input: which structures to extract from (standard SEAMM block)
+        # ------------------------------------------------------------------ #
+        **seamm.standard_parameters.structure_selection_parameters,
+        # ------------------------------------------------------------------ #
         # What to extract
         # ------------------------------------------------------------------ #
         "cluster sizes": {
@@ -50,10 +54,10 @@ class ExtractClustersParameters(seamm.Parameters):
             "format_string": "",
             "description": "Clusters per size:",
             "help_text": (
-                "How many clusters of each size to extract from the current "
-                "configuration. Fewer are produced if the configuration does not "
-                "contain enough distinct connected clusters, or if stratification "
-                "quotas cannot fill."
+                "How many clusters of each size to extract from each selected "
+                "configuration (frame). Fewer are produced if the configuration "
+                "does not contain enough distinct connected clusters, or if "
+                "stratification quotas cannot fill."
             ),
         },
         # ------------------------------------------------------------------ #
@@ -223,10 +227,9 @@ class ExtractClustersParameters(seamm.Parameters):
             "description": "Name the cluster system:",
             "help_text": (
                 "The name of the system that receives the clusters, created if it "
-                "does not exist. 'from source' uses '<source system> clusters'. "
-                "Extracting from several frames into the same system accumulates "
-                "the clusters there, provided the configuration name prefix "
-                "differs between frames."
+                "does not exist. 'from source' uses '<source system> clusters', "
+                "with the system of the first selected structure. The clusters from "
+                "all selected frames go into this one system."
             ),
         },
         "name prefix": {
@@ -240,7 +243,8 @@ class ExtractClustersParameters(seamm.Parameters):
                 "Each cluster is named '<prefix><seed>_<m1-m2-...>' from the "
                 "source molecules, which is unique within a frame. The prefix "
                 "keeps the names unique across frames: 'from configuration' uses "
-                "'<source configuration name>_'; 'none' uses no prefix; any other "
+                "'<source configuration name>_' (the default, and the right choice "
+                "when several frames are selected); 'none' uses no prefix; any other "
                 "text is used literally (a variable such as '$frame_' works)."
             ),
         },
@@ -267,8 +271,7 @@ class ExtractClustersParameters(seamm.Parameters):
             "help_text": (
                 "Whether to make the cluster system (and its first configuration) "
                 "the current one, so that a following Write Structure step writes "
-                "the clusters. Choose 'no' when the source frame must remain "
-                "current, e.g. inside a loop that reads frames into it."
+                "the clusters. Choose 'no' when the source must remain current."
             ),
         },
     }
