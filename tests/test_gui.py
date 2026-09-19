@@ -48,6 +48,9 @@ def test_dialog_layouts(tk_node):
     assert not tk_node["balance motifs"].winfo_ismapped()
     tk_node["motifs"].set("any")
     tk_node.reset_dialog()
+    assert tk_node["centre coordination"].grid_info() != {}
+    tk_node["centre coordination"].set("3")
+    tk_node.reset_dialog()
     for systems in ("name matches", "all", "current"):
         tk_node["source systems"].set(systems)
         tk_node.reset_dialog()

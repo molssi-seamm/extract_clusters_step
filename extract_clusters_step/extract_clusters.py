@@ -170,6 +170,12 @@ class ExtractClusters(seamm.Node):
         motifs = str(P["motifs"]).strip()
         if motifs.lower() not in ("", "any"):
             text += f" Only clusters with the motif(s) {motifs} will be accepted."
+        coordination = str(P["centre coordination"]).strip()
+        if coordination.lower() not in ("", "any"):
+            text += (
+                " Only clusters whose most-connected molecule has "
+                f"{coordination} contacts will be accepted."
+            )
         if self._truthy(P["balance motifs"]):
             text += (
                 " The set will also be balanced over the topology of the contact "
@@ -264,6 +270,7 @@ class ExtractClusters(seamm.Node):
         else:
             raise ValueError(f"Unknown stratification '{strat}'")
         motifs = self._parse_motifs(P["motifs"], sizes)
+        coordination = self._parse_coordination(P["centre coordination"], sizes)
         balance_motifs = self._truthy(P["balance motifs"])
         if motifs is not None and len(motifs) == 1:
             balance_motifs = False  # nothing to balance over
@@ -309,6 +316,7 @@ class ExtractClusters(seamm.Node):
                     spread_bins=spread_bins,
                     balance_motifs=balance_motifs,
                     motifs=motifs,
+                    coordination=coordination,
                     system=new_system,
                     name_prefix=prefix,
                     max_attempts=attempts * n_samples,
@@ -329,6 +337,7 @@ class ExtractClusters(seamm.Node):
             sources=[(c.system.name, c.name) for c in sources],
             destination_system=new_system.name,
             motifs=motifs,
+            coordination=coordination,
             results=results,
         )
 
@@ -344,6 +353,7 @@ class ExtractClusters(seamm.Node):
             sources=sources,
             seed=seed_used,
             motifs=motifs,
+            coordination=coordination,
         )
 
         return next_node
@@ -357,6 +367,7 @@ class ExtractClusters(seamm.Node):
         sources=None,
         seed=None,
         motifs=None,
+        coordination=None,
         **kwargs,
     ):
         """Report the extracted clusters to step.out.
@@ -417,6 +428,15 @@ class ExtractClusters(seamm.Node):
                 text += (
                     f" Restricted to the motif(s) {', '.join(sorted(motifs))}; "
                     f"{rejected} candidates rejected for their motif."
+                )
+            if coordination is not None:
+                rejected = sum(
+                    info["rejected_coordination"] for _, _, _, _, _, info in rows
+                )
+                text += (
+                    " Restricted to a centre coordination of "
+                    f"{', '.join(str(c) for c in sorted(coordination))}; "
+                    f"{rejected} candidates rejected for their coordination."
                 )
             if records:
                 rg = [r["rg"] for r in records]
@@ -614,10 +634,46 @@ class ExtractClusters(seamm.Node):
         return motifs
 
     @staticmethod
+    def _parse_coordination(text, sizes):
+        """The allowed centre coordinations: None for 'any', else a set of ints.
+
+        Accepts the SEAMM list syntax, e.g. '3', '3, 4' or '3:5'. A coordination
+        must be possible for at least one requested size (at most size - 1).
+        """
+        if isinstance(text, str) and text.strip().lower() in ("", "any"):
+            return None
+        from seamm_util.list_definition import parse_list
+
+        try:
+            values = parse_list(str(text))
+        except Exception:
+            raise ValueError(
+                f"Cannot understand the centre coordination '{text}'; give a value "
+                "or list such as '3', '3, 4' or '3:5'."
+            )
+        result = set()
+        for v in values:
+            if isinstance(v, float) and not v.is_integer():
+                raise ValueError(f"The centre coordination must be an integer, not {v}")
+            v = int(v)
+            if v < 1:
+                raise ValueError("The centre coordination must be at least 1.")
+            result.add(v)
+        if min(result) > max(sizes) - 1:
+            raise ValueError(
+                f"A centre coordination of {min(result)} needs at least "
+                f"{min(result) + 1} molecules; the largest cluster size is "
+                f"{max(sizes)}."
+            )
+        return result
+
+    @staticmethod
     def _write_summary(path, results, **provenance):
         """Write a JSON summary: the seed and other provenance, and the counts."""
         summary = dict(provenance)
         summary["motifs"] = provenance.get("motifs")
+        coordination = provenance.get("coordination")
+        summary["coordination"] = None if coordination is None else sorted(coordination)
         summary["clusters"] = {}
         summary["frames"] = []
         for n in sorted({r[2] for r in results}):
@@ -629,7 +685,13 @@ class ExtractClusters(seamm.Node):
                 rejected_motif=sum(
                     info["rejected_motif"] for _, _, _, _, _, info in rows
                 ),
+                rejected_coordination=sum(
+                    info["rejected_coordination"] for _, _, _, _, _, info in rows
+                ),
                 by_motif=dict(Counter(r["motif"] for r in records)),
+                by_centre_coordination=dict(
+                    Counter(int(r["degrees"][0]) for r in records)
+                ),
             )
         for frame, configuration, n, configurations, records, info in results:
             summary["frames"].append(
@@ -662,6 +724,7 @@ class ExtractClusters(seamm.Node):
             "rg",
             "dmax",
             "n_edges",
+            "centre_coordination",
             "degrees",
             "seed",
             "molecules",
@@ -682,6 +745,7 @@ class ExtractClusters(seamm.Node):
                             f"{r['rg']:.4f}",
                             f"{r['dmax']:.4f}",
                             r["n_edges"],
+                            r["degrees"][0],
                             "-".join(str(d) for d in r["degrees"]),
                             r["seed"],
                             "-".join(str(m) for m in r["molecules"]),

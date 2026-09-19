@@ -98,3 +98,17 @@ def test_make_rng_reports_seed():
     assert seed2 == seed
     assert rng.integers(10**6) == rng2.integers(10**6)
     assert ExtractClusters._make_rng("42")[1] == 42
+
+
+def test_parse_coordination():
+    assert ExtractClusters._parse_coordination("any", [4]) is None
+    assert ExtractClusters._parse_coordination("", [4]) is None
+    assert ExtractClusters._parse_coordination("3", [4]) == {3}
+    assert ExtractClusters._parse_coordination("3, 4", [5]) == {3, 4}
+    assert ExtractClusters._parse_coordination("3:5", [6, 7]) == {3, 4, 5}
+    with pytest.raises(ValueError):
+        ExtractClusters._parse_coordination("4", [4])  # needs 5 molecules
+    with pytest.raises(ValueError):
+        ExtractClusters._parse_coordination("0", [4])
+    with pytest.raises(ValueError):
+        ExtractClusters._parse_coordination("three", [4])
