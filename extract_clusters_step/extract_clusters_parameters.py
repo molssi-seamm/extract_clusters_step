@@ -168,6 +168,22 @@ class ExtractClustersParameters(seamm.Parameters):
                 "the set comes up short."
             ),
         },
+        "centre coordination": {
+            "default": "any",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": ("any",),
+            "format_string": "",
+            "description": "Centre coordination:",
+            "help_text": (
+                "Accept only clusters whose most-connected molecule has this many "
+                "contacts within the cluster: a value or SEAMM list such as '3' "
+                "(star tetramers), '4' (a complete first shell) or '3:4'. 'any' "
+                "accepts all. Applied at acceptance, so the set contains only such "
+                "clusters instead of being post-filtered; the value is also stored "
+                "on every cluster as the 'centre coordination' property."
+            ),
+        },
         "balance motifs": {
             "default": "no",
             "kind": "boolean",
@@ -198,7 +214,9 @@ class ExtractClustersParameters(seamm.Parameters):
                 "The seed for the random-number generator. Use 'random' for a "
                 "fresh seed, or an integer for a reproducible selection. The seed "
                 "actually used is always printed in the output, so a 'random' run "
-                "can be reproduced by entering that value here."
+                "can be reproduced by entering that value here. A supplementary run "
+                "over the same frames must use a DIFFERENT seed, or it will largely "
+                "regenerate the same clusters."
             ),
         },
         "attempts per cluster": {

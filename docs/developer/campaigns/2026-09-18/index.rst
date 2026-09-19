@@ -85,3 +85,28 @@ the conversions of Loop and Write Structure come after, each its own release.
 Open decisions: whether Part A lives in ``seamm.Node`` (preferred: it needs the
 variables and the current system) or a separate library; whether the motif
 restriction takes a list (yes -- implemented in item 2).
+
+Follow-up 2026-09-19: coordination as the organising variable
+--------------------------------------------------------------
+
+The labelled n-mer set (1684 clusters) showed the trimer MLFF over-binds
+three-coordinated centres (star tetramers) while chains are error-free
+(``~/Sites/mlff-training/2026-09-18_water-four-body-diagnostic/``), so the next
+training sets are organised by the coordination of the most-connected molecule:
+stars (n = 4, centre coordination 3), 4-stars (n = 5, coordination 4) and
+first-shell-plus (n = 6-7, coordination 4). For n >= 5 the motif is only
+``e<edges>``, which cannot tell a 4-star from a 5-chain. Delivered:
+
+* ``centre coordination`` (the maximum degree of the induced contact graph) and
+  ``degrees`` (the full sequence) stored as ``#ExtractClusters#scan`` properties
+  and written to ``clusters.csv`` / ``summary.json``.
+* A *Centre coordination* parameter (a value or SEAMM list such as ``3``, ``4``
+  or ``3:4``) applied at acceptance, before the quotas, with the pilot sample
+  honouring it so the bin edges describe the accepted population; rejections
+  are counted and reported.
+* The seed caveat: a supplementary run over the same frames needs a distinct
+  seed (two jobs with ``$_loop_index`` seeds regenerated ~75 % identical
+  clusters). Now in the parameter help and the user guide.
+
+Still open: a per-element-pair contact cutoff for mixed systems (EC/FEC + ions).
+

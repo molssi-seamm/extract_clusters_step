@@ -55,6 +55,15 @@ offers the motifs the requested cluster sizes can produce. Rare motifs use up th
 attempt budget quickly, so raise *Attempts per cluster* if the set comes up short;
 the output reports how many candidates were rejected for their motif.
 
+*Centre coordination* accepts only clusters whose most-connected molecule has
+the given number of contacts within the cluster, e.g. ``3`` for star tetramers
+(a centre with three hydrogen-bonded neighbours), ``4`` for a complete first
+shell, or a list such as ``3:4``. This is the organising variable of the
+many-body training sets: for five or more molecules the motif is only labelled
+by its number of contacts, and a 4-star cannot be told from a 5-chain without
+it. It is also stored on every cluster as the ``centre coordination`` property,
+with the full degree sequence as ``degrees``.
+
 *Balance motifs* also balances the set over the topology of the contact graph
 within the cluster. Topology and spread are correlated -- rings only exist
 compact -- so some (motif, bin) cells are physically empty and the set then
@@ -89,13 +98,16 @@ Clusters per size
 Contact cutoff, Contact elements
     Define the contact graph. 3.5 Å between oxygens is the usual hydrogen-bond
     criterion for water.
-Spread metric, Stratify by spread, Number of bins / Bin edges, Balance motifs
+Spread metric, Stratify by spread, Number of bins / Bin edges, Restrict to motifs, Centre coordination, Balance motifs
     See *Stratification* above. Only the controls that apply to the chosen
     scheme are shown.
 Random seed
     ``random`` or an integer. The seed actually used is always printed in the
     output and written to ``summary.json``, so a ``random`` run can be reproduced
-    by entering that value.
+    by entering that value. A supplementary run over the same frames must use a
+    *different* seed: two runs with the same seed regenerate largely the same
+    clusters (about three quarters identical in one real case), and dedupe
+    afterwards cannot recover the wasted labelling.
 Attempts per cluster
     The sampling budget: total attempts = this × clusters requested.
 Name the cluster system, Configuration name prefix, Store descriptors as properties, Make the cluster system current

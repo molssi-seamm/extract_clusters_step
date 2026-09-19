@@ -161,6 +161,7 @@ class TkExtractClusters(seamm.TkNode):
             "number of bins": "stratification frame",
             "bin edges": "stratification frame",
             "motifs": "stratification frame",
+            "centre coordination": "stratification frame",
             "balance motifs": "stratification frame",
             "system name": "output frame",
             "name prefix": "output frame",
@@ -277,6 +278,7 @@ class TkExtractClusters(seamm.TkNode):
         self["motifs"].combobox.config(values=names)
         motifs = [t for t in re.split(r"[,\s]+", self["motifs"].get().strip()) if t]
         keys.append("motifs")
+        keys.append("centre coordination")
         # A single motif leaves nothing to balance over, so hide the option.
         if not (len(motifs) == 1 and motifs[0].lower() != "any"):
             keys.append("balance motifs")

@@ -236,26 +236,49 @@ def cluster_motif(adj, order):
     return classify_motif(len(order), len(sub_edges), degrees), len(sub_edges), degrees
 
 
+def accepts_topology(adj, order, motifs=None, coordination=None):
+    """Whether the cluster ``order`` passes the motif and centre-coordination
+    filters. Returns (accepted, motif, n_edges, degrees)."""
+    motif, n_edges, degrees = cluster_motif(adj, order)
+    if motifs is not None and motif not in motifs:
+        return False, motif, n_edges, degrees
+    if coordination is not None and degrees[0] not in coordination:
+        return False, motif, n_edges, degrees
+    return True, motif, n_edges, degrees
+
+
 def pilot_spreads(
-    adj, n, frac_centroids, T, periodic, spread_metric, n_mol, rng, n_pilot, motifs=None
+    adj,
+    n,
+    frac_centroids,
+    T,
+    periodic,
+    spread_metric,
+    n_mol,
+    rng,
+    n_pilot,
+    motifs=None,
+    coordination=None,
 ):
     """Spread values of an unstratified pilot sample, used to place bin edges.
 
-    If ``motifs`` is given only clusters with those motifs are sampled, so the
-    bin edges describe the distribution the extraction will actually draw from
-    (ring trimers, say, are compact and never reach the widest all-motif bin).
+    If ``motifs`` or ``coordination`` is given only clusters passing those
+    filters are sampled, so the bin edges describe the distribution the
+    extraction will actually draw from (ring trimers, say, are compact and never
+    reach the widest all-motif bin).
     """
     out = []
     tries = 0
-    # A motif restriction can reject most candidates, so allow many more tries.
-    max_tries = (200 if motifs is not None else 20) * n_pilot
+    # A topology restriction can reject most candidates, so allow more tries.
+    restricted = motifs is not None or coordination is not None
+    max_tries = (200 if restricted else 20) * n_pilot
     while len(out) < n_pilot and tries < max_tries:
         tries += 1
         g = grow_connected(adj, int(rng.integers(n_mol)), n, rng)
         if g is None:
             continue
         order, parent = g
-        if motifs is not None and cluster_motif(adj, order)[0] not in motifs:
+        if restricted and not accepts_topology(adj, order, motifs, coordination)[0]:
             continue
         shifts = unwrap_shifts(order, parent, frac_centroids, periodic)
         cen = np.array([(frac_centroids[m] + shifts[m]) @ T for m in order])
@@ -352,6 +375,7 @@ def extract_nmers(
     spread_bins=None,
     balance_motifs=False,
     motifs=None,
+    coordination=None,
     system=None,
     system_name="clusters",
     name_prefix="",
@@ -402,6 +426,12 @@ def extract_nmers(
         :func:`motif_names`); None accepts every motif. Rejected candidates
         count against the attempt budget, so rare motifs (rings are a few
         percent of water trimers) may need a larger budget.
+    coordination : iterable of int or None
+        Accept only clusters whose most-connected molecule has one of these
+        numbers of contacts within the cluster (its degree in the induced
+        contact graph) -- e.g. ``[3]`` for star tetramers, ``[4]`` for a
+        complete first shell. None accepts any. Stored on every cluster as the
+        ``centre coordination`` property.
     system : molsystem _System or None
         Destination system. If None, ``system_name`` is looked up in the
         configuration's database and created if needed.
@@ -488,6 +518,8 @@ def extract_nmers(
 
     if motifs is not None:
         motifs = set(motifs)
+    if coordination is not None:
+        coordination = {int(c) for c in coordination}
 
     # Stratification bins -----------------------------------------------------
     if isinstance(spread_bins, (int, np.integer)):
@@ -505,11 +537,14 @@ def extract_nmers(
             rng,
             n_pilot=max(200, 20 * n_bins_requested),
             motifs=motifs,
+            coordination=coordination,
         )
         if len(pilot) < 2 * n_bins_requested:
             what = f"{n}-mers"
             if motifs is not None:
                 what += f" with motif(s) {sorted(motifs)}"
+            if coordination is not None:
+                what += f" with centre coordination {sorted(coordination)}"
             raise ValueError(
                 f"Too few {what} found ({len(pilot)}) to choose "
                 f"{n_bins_requested} spread bins; use fewer bins or no stratification"
@@ -547,6 +582,7 @@ def extract_nmers(
     counts = Counter()
     attempts = 0
     n_rejected_motif = 0
+    n_rejected_coordination = 0
     while len(configurations) < n_samples and attempts < max_attempts:
         attempts += 1
         seed = int(rng.integers(n_mol))
@@ -566,6 +602,9 @@ def extract_nmers(
         motif, n_edges, degrees = cluster_motif(adj, order)
         if motifs is not None and motif not in motifs:
             n_rejected_motif += 1
+            continue
+        if coordination is not None and degrees[0] not in coordination:
+            n_rejected_coordination += 1
             continue
 
         if edges is not None:
@@ -639,6 +678,8 @@ def extract_nmers(
             _put("spread dmax", dmax, "Å")
             _put("n edges", n_edges, None, "int")
             _put("motif", motif, None, "str")
+            _put("centre coordination", int(degrees[0]), None, "int")
+            _put("degrees", "-".join(str(d) for d in degrees), None, "str")
             _put("spread bin", b, None, "int")
             _put(
                 "source molecules", "-".join(str(m) for m in sorted(order)), None, "str"
@@ -656,6 +697,11 @@ def extract_nmers(
             warning += (
                 f"; {n_rejected_motif} candidates were rejected for not being one of "
                 f"{sorted(motifs)}"
+            )
+        if coordination is not None:
+            warning += (
+                f"; {n_rejected_coordination} candidates were rejected for a centre "
+                f"coordination not in {sorted(coordination)}"
             )
         if stratified:
             warning += (
@@ -678,6 +724,7 @@ def extract_nmers(
         n_molecules=n_mol,
         n_contacts=n_contacts,
         rejected_motif=n_rejected_motif,
+        rejected_coordination=n_rejected_coordination,
         warning=warning,
     )
     return configurations, records, info

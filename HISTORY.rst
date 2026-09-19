@@ -1,6 +1,19 @@
 =======
 History
 =======
+2026.9.19 -- Centre coordination: stored, and selectable
+    * Every cluster now carries a ``centre coordination`` property -- the number of
+      contacts of its most-connected molecule within the cluster -- and the full
+      ``degrees`` sequence, in ``clusters.csv`` and ``summary.json`` too. For five or
+      more molecules the motif is only labelled by its number of contacts, so this is
+      what distinguishes a 4-star from a 5-chain.
+    * A new "Centre coordination" option accepts only clusters with the given
+      coordination(s), e.g. ``3`` for star tetramers or ``4`` for a complete first
+      shell, applied at acceptance so the set need not be post-filtered. Candidates
+      rejected for it are counted and reported.
+    * The random-seed help and the user guide now say that a supplementary run over
+      the same frames must use a different seed.
+
 2026.9.18.2 -- Bugfix: the dialog failed to open
     * Opening the step's dialog failed with "'LabeledCombobox' object has no
       attribute 'entry'": the binding that updates the motif list when the cluster

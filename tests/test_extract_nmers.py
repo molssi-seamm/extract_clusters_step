@@ -522,3 +522,47 @@ def test_node_selection_by_variable_and_name(water_box, tmp_path, monkeypatch):
     node.run()
     names = [c.name for c in db.get_systems("by variable")[0].configurations]
     assert len(names) == 4 and all(n.startswith("other_") for n in names)
+
+
+def test_centre_coordination_property_and_filter(water_box):
+    """centre coordination is stored, and the filter keeps only such clusters."""
+    confs, recs, info = extract_nmers(
+        water_box,
+        4,
+        8,
+        contact_elements=["O"],
+        coordination=[3],
+        rng=5,
+        max_attempts=5000,
+    )
+    assert len(confs) == 8
+    for c, r in zip(confs, recs):
+        assert r["degrees"][0] == 3
+        assert _prop(c, "centre coordination") == 3
+        assert _prop(c, "degrees") == "-".join(str(d) for d in r["degrees"])
+        assert r["motif"] in ("star", "paw", "diamond", "K4")
+    assert info["rejected_coordination"] > 0
+    # a 4-star among pentamers: only e4 (a tree) with centre 4
+    confs, recs, info = extract_nmers(
+        water_box,
+        5,
+        4,
+        contact_elements=["O"],
+        coordination=[4],
+        rng=6,
+        max_attempts=20000,
+    )
+    for r in recs:
+        assert r["degrees"][0] == 4
+        assert r["degrees"] == [4, 1, 1, 1, 1] or r["n_edges"] > 4
+    # chains only: coordination 2
+    confs, recs, info = extract_nmers(
+        water_box,
+        4,
+        6,
+        contact_elements=["O"],
+        coordination=[2],
+        rng=7,
+        max_attempts=5000,
+    )
+    assert {r["motif"] for r in recs} <= {"chain", "ring"}
