@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>2026-09-17: Cluster (n-mer) extraction for MLFF data &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="2026-09-18: Reproducibility, motif selection, many frames" href="../2026-09-18/index.html" />
+    <link rel="prev" title="Developer Guide" href="../../index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../2026-09-18/index.html" title="2026-09-18: Reproducibility, motif selection, many frames"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../../index.html" title="Developer Guide"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Developer Guide</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">2026-09-17: Cluster (n-mer) extraction for MLFF data</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="cluster-n-mer-extraction-for-mlff-data">
+<h1>2026-09-17: Cluster (n-mer) extraction for MLFF data<a class="headerlink" href="#cluster-n-mer-extraction-for-mlff-data" title="Link to this heading">¶</a></h1>
+<p>This is the design record for the plug-in, moved here from the workspace
+planning document (<code class="docutils literal notranslate"><span class="pre">~/Work/SEAMM/nmer-extractor-plan.md</span></code>) once the package
+existed. The science context is canonical in the <code class="docutils literal notranslate"><span class="pre">~/Sites</span></code> lab notebook:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">~/Sites/mlff-training/2026-09-15_water-liquid-density-diagnostics/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">~/Sites/training-data/2026-08-13_h2o-trimer-run1/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">~/Sites/mlff-training/2026-09-16_trimer-mlff-liquid-density/</span></code></p></li>
+</ul>
+<section id="why">
+<h2>Why<a class="headerlink" href="#why" title="Link to this heading">¶</a></h2>
+<p>A water MLFF trained on dimers only ran NPT at 0.664 g/cm³ with hydrogen bonds
+frozen at the gas-phase dimer distance. Adding a trimer set recovered the
+liquid (1.037 g/cm³, correct O–O peak and coordination); at the experimental
+density the remaining defect is the equation of state alone, ≈1.7 kJ/mol per
+molecule of excess cohesion – the size of the omitted four-body term. Hence a
+general way to pull n-mers (n = 3, 4, 5, and larger clusters) out of
+condensed-phase configurations, to measure E₄ directly and to add balanced
+n-mer sets to the training data.</p>
+</section>
+<section id="design-decisions">
+<h2>Design decisions<a class="headerlink" href="#design-decisions" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Connected-subgraph sampling, not nearest neighbours.</strong> Nearest-neighbour
+selection gives one deterministic, maximally compact cluster per frame and
+kills topological variety; for water the linear hydrogen-bond chain is
+exactly where cooperativity is largest. An n-mer is a connected subgraph of
+the molecular contact graph (A~B if any contact atom of A is within the
+cutoff of one of B, minimum image), grown by random frontier expansion from
+a random seed.</p></li>
+<li><p><strong>Stratify, don’t just accept.</strong> Flat-in-spread acceptance (radius of
+gyration or largest centroid separation) with quantile edges from a pilot
+sample – the dimer builder’s flat-in-energy philosophy – plus optional
+joint balancing on motif.</p></li>
+<li><p><strong>Gas-phase clusters done right:</strong> unwrap by parent (each molecule made
+contiguous with the neighbour it attached through), centre, periodicity 0,
+molecules and bonds intact.</p></li>
+<li><p><strong>Provenance on every configuration:</strong> unique names
+<code class="docutils literal notranslate"><span class="pre">{prefix}{seed}_{m1-m2-...}</span></code> (SEAMM loops key on configuration names) and
+<code class="docutils literal notranslate"><span class="pre">*#ExtractClusters#scan</span></code> properties that survive SDF export.</p></li>
+<li><p><strong>General, not water-specific:</strong> molecules by bonds, contact criterion by
+element list or all atoms, any cell (periodic KD-tree for orthorhombic,
+exact chunked minimum image otherwise), non-periodic sources too.</p></li>
+</ol>
+</section>
+<section id="verified">
+<h2>Verified<a class="headerlink" href="#verified" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Both contact-graph paths agree with brute-force minimum image; grown
+clusters are connected and contiguous after unwrapping; motif labels are
+correct (<code class="docutils literal notranslate"><span class="pre">tests/test_cluster_sampling.py</span></code>).</p></li>
+<li><p>End to end on a synthetic periodic box and on the real 1667-water frame
+(<code class="docutils literal notranslate"><span class="pre">~/Work/SEAMM/Testing/extract_clusters.flow</span></code> + <code class="docutils literal notranslate"><span class="pre">water_box.cif</span></code>): 30
+trimers + 30 tetramers, flat over 3 quantile bins, unique names, 3n atoms /
+2n bonds, centred, connected, properties present in the written SDF.</p></li>
+</ul>
+</section>
+<section id="known-behaviour">
+<h2>Known behaviour<a class="headerlink" href="#known-behaviour" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Topology and spread are correlated.</strong> With motif balancing, (ring, outer
+bin) quota cells can never fill and the call returns short with a warning
+naming the cause. The quota policy (redistribute, balance one axis, or accept
+unequal cells) is an open design choice; do not “fix” it silently – it is
+real physics.</p></li>
+<li><p>Hand-picked bin edges are usually wrong (no water trimer has rg &lt; 1.6 Å);
+prefer quantile bins.</p></li>
+<li><p>molsystem: <code class="docutils literal notranslate"><span class="pre">from_mmcif_text</span></code> drops the <code class="docutils literal notranslate"><span class="pre">_cell</span></code> tags of a SEAMM-written
+mmCIF and loads it non-periodic (use <code class="docutils literal notranslate"><span class="pre">.cif</span></code> for periodic frames);
+<code class="docutils literal notranslate"><span class="pre">symmetry.bond_atoms</span></code> is never populated for periodicity 0, so
+<code class="docutils literal notranslate"><span class="pre">bond_index_pairs</span></code> reads the bond table directly when there is no
+symmetry.</p></li>
+</ul>
+</section>
+<section id="open-items">
+<h2>Open items<a class="headerlink" href="#open-items" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Quota redistribution vs one-axis balancing (above).</p></li>
+<li><p>Seed-environment stratification (coordination number / tetrahedral order
+q) so minority environments are sampled.</p></li>
+<li><p>Large clusters (n ≈ 10–30) to fill the MLFF receptive field: same sampler,
+motif naming beyond n = 4 is <code class="docutils literal notranslate"><span class="pre">e&lt;edges&gt;</span></code>.</p></li>
+<li><p>Mixed systems (EC/FEC + Li⁺/BF₄⁻): per-element-pair contact criteria;
+charged fragments need net charge/multiplicity carried to the CP step.</p></li>
+<li><p>Performance for ≫10⁴ atoms with non-orthorhombic cells (general path is
+O(N²) on contact atoms; a supercell KD-tree would fix it).</p></li>
+<li><p>A trajectory-frame loader into a periodic molsystem configuration.</p></li>
+<li><p>First real use: tetramers from the ρ = 0.997 NVT trajectory → N-fragment
+counterpoise labelling → MLFF vs revDSD tetramer energies (direct E₄
+diagnostic).</p></li>
+</ol>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">2026-09-17: Cluster (n-mer) extraction for MLFF data</a><ul>
+<li><a class="reference internal" href="#why">Why</a></li>
+<li><a class="reference internal" href="#design-decisions">Design decisions</a></li>
+<li><a class="reference internal" href="#verified">Verified</a></li>
+<li><a class="reference internal" href="#known-behaviour">Known behaviour</a></li>
+<li><a class="reference internal" href="#open-items">Open items</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="../../index.html"
+                          title="previous chapter">Developer Guide</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="../2026-09-18/index.html"
+                          title="next chapter">2026-09-18: Reproducibility, motif selection, many frames</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/developer/campaigns/2026-09-17/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../2026-09-18/index.html" title="2026-09-18: Reproducibility, motif selection, many frames"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../../index.html" title="Developer Guide"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Developer Guide</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">2026-09-17: Cluster (n-mer) extraction for MLFF data</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

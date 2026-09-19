@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>extract_clusters_step.extract_clusters_parameters &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step.extract_clusters_parameters</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for extract_clusters_step.extract_clusters_parameters</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">"""</span>
+<span class="sd">Control parameters for the Extract Clusters step in a SEAMM flowchart</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seamm</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ExtractClustersParameters">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ExtractClustersParameters</span><span class="p">(</span><span class="n">seamm</span><span class="o">.</span><span class="n">Parameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    The control parameters for Extract Clusters.</span>
+
+<span class="sd">    The keys are the parameters for this plug-in; each value is a dictionary</span>
+<span class="sd">    describing that parameter (default, kind, units, enumeration, format,</span>
+<span class="sd">    description, help).</span>
+
+<span class="sd">    parameters : {str: {str: str}}</span>
+<span class="sd">        A dictionary containing the parameters for the current step.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    ExtractClusters, TkExtractClusters, ExtractClustersStep</span>
+<span class="sd">    """</span>
+
+    <span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="c1"># Input: which structures to extract from (standard SEAMM block)</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="o">**</span><span class="n">seamm</span><span class="o">.</span><span class="n">standard_parameters</span><span class="o">.</span><span class="n">structure_selection_parameters</span><span class="p">,</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="c1"># What to extract</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="s2">"cluster sizes"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"3"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Cluster sizes (molecules):"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The number of molecules per cluster. A comma- or space-separated "</span>
+                <span class="s2">"list, e.g. '3, 4', extracts a set of each size from the same "</span>
+                <span class="s2">"frame. Each must be at least 2."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"number of clusters"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"integer"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Clusters per size:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"How many clusters of each size to extract from each selected "</span>
+                <span class="s2">"configuration (frame). Fewer are produced if the configuration "</span>
+                <span class="s2">"does not contain enough distinct connected clusters, or if "</span>
+                <span class="s2">"stratification quotas cannot fill."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="c1"># The contact graph</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="s2">"contact cutoff"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="mf">3.5</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"float"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">"Å"</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">".2f"</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Contact cutoff:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Two molecules are in contact if any of their contact atoms are "</span>
+                <span class="s2">"within this distance (minimum image). A cluster is a connected "</span>
+                <span class="s2">"set of molecules under this criterion. 3.5 Å between oxygens is "</span>
+                <span class="s2">"the usual hydrogen-bond criterion for water."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"contact elements"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"all"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"all"</span><span class="p">,),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Contact elements:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The elements whose atoms define contact, e.g. 'O' or 'O, N'. "</span>
+                <span class="s2">"'all' uses every atom. Restricting to the heavy atoms that form "</span>
+                <span class="s2">"the intermolecular contacts (e.g. O for water) makes the cutoff "</span>
+                <span class="s2">"meaningful and the graph cheaper to build."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="c1"># Stratification</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="s2">"spread metric"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"radius of gyration"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"enum"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"radius of gyration"</span><span class="p">,</span> <span class="s2">"maximum centroid distance"</span><span class="p">),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Spread metric:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The compactness coordinate of a cluster, computed from the "</span>
+                <span class="s2">"molecular centroids: the radius of gyration, or the largest "</span>
+                <span class="s2">"centroid-centroid distance. Used for stratification and stored "</span>
+                <span class="s2">"on each cluster."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"stratification"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"quantile bins"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"enum"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"none"</span><span class="p">,</span> <span class="s2">"quantile bins"</span><span class="p">,</span> <span class="s2">"explicit bin edges"</span><span class="p">),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Stratify by spread:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Whether to accept clusters so that the set is flat in the spread "</span>
+                <span class="s2">"metric. 'quantile bins' places the bin edges at equal quantiles "</span>
+                <span class="s2">"of a pilot sample of the frame, so the bins adapt to the cluster "</span>
+                <span class="s2">"size and system; 'explicit bin edges' uses the edges given below; "</span>
+                <span class="s2">"'none' accepts clusters as sampled (biased towards the compact "</span>
+                <span class="s2">"clusters that dominate the liquid)."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"number of bins"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"integer"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Number of bins:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The number of equal-quantile bins of the spread metric. The "</span>
+                <span class="s2">"clusters are accepted so that the bins fill roughly evenly."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"bin edges"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">"Å"</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Bin edges:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The bin edges of the spread metric, in Å, as an increasing comma- "</span>
+                <span class="s2">"or space-separated list, e.g. '1.6, 2.0, 2.5, 3.5'. Clusters "</span>
+                <span class="s2">"outside the outer edges are rejected. Note that sensible edges "</span>
+                <span class="s2">"depend strongly on the cluster size and the system; 'quantile "</span>
+                <span class="s2">"bins' is usually the better choice."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"motifs"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"any"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"any"</span><span class="p">,),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Restrict to motifs:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Accept only clusters whose contact-graph topology is one of the "</span>
+                <span class="s2">"given motifs, e.g. 'ring', or 'ring, star' for several. 'any' "</span>
+                <span class="s2">"accepts all. Trimers have 'chain' and 'ring'; tetramers 'chain', "</span>
+                <span class="s2">"'star', 'ring', 'paw', 'diamond' and 'K4'; larger clusters are "</span>
+                <span class="s2">"labelled 'e&lt;n&gt;' by their number of contacts. Rare motifs use up "</span>
+                <span class="s2">"the attempt budget quickly, so raise 'Attempts per cluster' if "</span>
+                <span class="s2">"the set comes up short."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"centre coordination"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"any"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"any"</span><span class="p">,),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Centre coordination:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Accept only clusters whose most-connected molecule has this many "</span>
+                <span class="s2">"contacts within the cluster: a value or SEAMM list such as '3' "</span>
+                <span class="s2">"(star tetramers), '4' (a complete first shell) or '3:4'. 'any' "</span>
+                <span class="s2">"accepts all. Applied at acceptance, so the set contains only such "</span>
+                <span class="s2">"clusters instead of being post-filtered; the value is also stored "</span>
+                <span class="s2">"on every cluster as the 'centre coordination' property."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"balance motifs"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"no"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"boolean"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"yes"</span><span class="p">,</span> <span class="s2">"no"</span><span class="p">),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Balance motifs:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Also balance the set over the topology of the contact graph "</span>
+                <span class="s2">"within the cluster (chain / ring / star / ..., or the number of "</span>
+                <span class="s2">"contacts for clusters of more than four molecules), jointly with "</span>
+                <span class="s2">"the spread bins. Topology and spread are correlated -- rings only "</span>
+                <span class="s2">"exist compact -- so some cells cannot fill and the set will "</span>
+                <span class="s2">"come up short of the requested number; the summary shows which."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="c1"># Sampling</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="s2">"random seed"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"random"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"random"</span><span class="p">,),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Random seed:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The seed for the random-number generator. Use 'random' for a "</span>
+                <span class="s2">"fresh seed, or an integer for a reproducible selection. The seed "</span>
+                <span class="s2">"actually used is always printed in the output, so a 'random' run "</span>
+                <span class="s2">"can be reproduced by entering that value here. A supplementary run "</span>
+                <span class="s2">"over the same frames must use a DIFFERENT seed, or it will largely "</span>
+                <span class="s2">"regenerate the same clusters."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"attempts per cluster"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"integer"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Attempts per cluster:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The sampling budget: the total number of attempts is this times "</span>
+                <span class="s2">"the number of clusters requested. Attempts that duplicate an "</span>
+                <span class="s2">"earlier cluster, fall outside the bin edges, or land in a full "</span>
+                <span class="s2">"quota cell are rejected and count against the budget."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="c1"># Output</span>
+        <span class="c1"># ------------------------------------------------------------------ #</span>
+        <span class="s2">"system name"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"from source"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"from source"</span><span class="p">,),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Name the cluster system:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"The name of the system that receives the clusters, created if it "</span>
+                <span class="s2">"does not exist. 'from source' uses '&lt;source system&gt; clusters', "</span>
+                <span class="s2">"with the system of the first selected structure. The clusters from "</span>
+                <span class="s2">"all selected frames go into this one system."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"name prefix"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"from configuration"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"from configuration"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Configuration name prefix:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Each cluster is named '&lt;prefix&gt;&lt;seed&gt;_&lt;m1-m2-...&gt;' from the "</span>
+                <span class="s2">"source molecules, which is unique within a frame. The prefix "</span>
+                <span class="s2">"keeps the names unique across frames: 'from configuration' uses "</span>
+                <span class="s2">"'&lt;source configuration name&gt;_' (the default, and the right choice "</span>
+                <span class="s2">"when several frames are selected); 'none' uses no prefix; any other "</span>
+                <span class="s2">"text is used literally (a variable such as '$frame_' works)."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"store properties"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"yes"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"boolean"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"yes"</span><span class="p">,</span> <span class="s2">"no"</span><span class="p">),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Store descriptors as properties:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Store the cluster size, spread, motif, number of contacts and "</span>
+                <span class="s2">"source molecules on each configuration as '#ExtractClusters#scan' "</span>
+                <span class="s2">"properties. They are carried through SDF/extxyz output."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"make current"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"yes"</span><span class="p">,</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"boolean"</span><span class="p">,</span>
+            <span class="s2">"default_units"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"enumeration"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"yes"</span><span class="p">,</span> <span class="s2">"no"</span><span class="p">),</span>
+            <span class="s2">"format_string"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"Make the cluster system current:"</span><span class="p">,</span>
+            <span class="s2">"help_text"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Whether to make the cluster system (and its first configuration) "</span>
+                <span class="s2">"the current one, so that a following Write Structure step writes "</span>
+                <span class="s2">"the clusters. Choose 'no' when the source must remain current."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">defaults</span><span class="o">=</span><span class="p">{},</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Initialize the parameters, by default with the parameters defined above</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        defaults: dict</span>
+<span class="sd">            A dictionary of parameters to initialize. The parameters</span>
+<span class="sd">            above are used first and any given will override/add to them.</span>
+<span class="sd">        data: dict</span>
+<span class="sd">            A dictionary of keys and a subdictionary with value and units</span>
+<span class="sd">            for updating the current, default values.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">        """</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"ExtractClustersParameters.__init__"</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="o">**</span><span class="n">ExtractClustersParameters</span><span class="o">.</span><span class="n">parameters</span><span class="p">,</span> <span class="o">**</span><span class="n">defaults</span><span class="p">},</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step.extract_clusters_parameters</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>History &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Usage" href="usage.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="usage.html" title="Usage"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">History</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="history">
+<h1>History<a class="headerlink" href="#history" title="Link to this heading">¶</a></h1>
+<dl class="simple">
+<dt>2026.9.19 – Centre coordination: stored, and selectable</dt><dd><ul class="simple">
+<li><p>Every cluster now carries a <code class="docutils literal notranslate"><span class="pre">centre</span> <span class="pre">coordination</span></code> property – the number of
+contacts of its most-connected molecule within the cluster – and the full
+<code class="docutils literal notranslate"><span class="pre">degrees</span></code> sequence, in <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code> and <code class="docutils literal notranslate"><span class="pre">summary.json</span></code> too. For five or
+more molecules the motif is only labelled by its number of contacts, so this is
+what distinguishes a 4-star from a 5-chain.</p></li>
+<li><p>A new “Centre coordination” option accepts only clusters with the given
+coordination(s), e.g. <code class="docutils literal notranslate"><span class="pre">3</span></code> for star tetramers or <code class="docutils literal notranslate"><span class="pre">4</span></code> for a complete first
+shell, applied at acceptance so the set need not be post-filtered. Candidates
+rejected for it are counted and reported.</p></li>
+<li><p>The random-seed help and the user guide now say that a supplementary run over
+the same frames must use a different seed.</p></li>
+</ul>
+</dd>
+<dt>2026.9.18.2 – Bugfix: the dialog failed to open</dt><dd><ul class="simple">
+<li><p>Opening the step’s dialog failed with “‘LabeledCombobox’ object has no
+attribute ‘entry’”: the binding that updates the motif list when the cluster
+sizes change assumed the wrong kind of widget. Fixed, and the dialog is now
+exercised by a test.</p></li>
+</ul>
+</dd>
+<dt>2026.9.18.1 – Extract from many structures in one step</dt><dd><ul class="simple">
+<li><p>The step now takes the standard SEAMM structure selection: the current
+configuration (the default, as before), all or the last or first
+configurations of the current system, of all systems, or of systems chosen
+by name, or a variable holding a list of configurations. Selecting all the
+configurations of a system that holds a trajectory extracts from every frame
+in one step, with no loop, and puts all the clusters in one system. Each
+frame’s clusters are prefixed with its configuration name; <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code>
+and <code class="docutils literal notranslate"><span class="pre">summary.json</span></code> record the frame; the report aggregates over frames and
+lists the count per frame. One random stream covers the whole run, so the
+printed seed reproduces it.</p></li>
+<li><p>Requires seamm 2026.9.18.1 and molsystem 2026.9.17.2 or later.</p></li>
+</ul>
+</dd>
+<dt>2026.9.18 – Reproducible seeds and motif selection</dt><dd><ul class="simple">
+<li><p>The random seed actually used is now always printed and recorded in a new
+<code class="docutils literal notranslate"><span class="pre">summary.json</span></code> in the step directory (with the source, bin edges and counts
+by motif), so a run made with the seed set to “random” can be reproduced by
+entering the printed value.</p></li>
+<li><p>A new “Restrict to motifs” option accepts only clusters with the given
+contact-graph topology, e.g. <code class="docutils literal notranslate"><span class="pre">ring</span></code> or <code class="docutils literal notranslate"><span class="pre">ring,</span> <span class="pre">star</span></code>. The dialog offers the
+motifs the requested cluster sizes can produce. Candidates rejected for their
+motif are counted and reported, since rare motifs use up the attempt budget.</p></li>
+</ul>
+</dd>
+<dt>2026.9.17.1 – Bugfix: a structure without bonds gave clusters of atoms</dt><dd><ul class="simple">
+<li><p>Molecules are identified from the bonds, so a configuration read from a format
+that carries no connectivity (extended XYZ without bond perception) was treated
+as one atom per molecule and the “clusters” were silently groups of atoms. The
+step now stops with a clear error pointing at the Read Structure “Perceive
+bonds” option. Configurations made only of noble-gas atoms or monatomic ions,
+which legitimately have no bonds, are still accepted.</p></li>
+</ul>
+</dd>
+<dt>2026.9.17 – Initial release of the Extract Clusters step</dt><dd><ul class="simple">
+<li><p>Extracts n-molecule clusters (trimers, tetramers, … larger n-mers) from the
+current, typically periodic, condensed-phase configuration as unwrapped,
+centred, non-periodic configurations in a new system, e.g. many-body training
+data and diagnostics for machine-learned force fields.</p></li>
+<li><p>Clusters are connected subgraphs of a molecular contact graph (molecules are in
+contact if their contact atoms are within a cutoff, minimum image), so chains,
+rings and stars all occur; several sizes can be extracted from one frame.</p></li>
+<li><p>Optional stratification so the set is flat in the radius of gyration or the
+largest centroid separation, with bin edges from equal quantiles of a pilot
+sample or given explicitly, and optional balancing over the contact-graph
+motif.</p></li>
+<li><p>Provenance on every cluster: unique names <code class="docutils literal notranslate"><span class="pre">&lt;frame&gt;_&lt;seed&gt;_&lt;molecules&gt;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">#ExtractClusters#scan</span></code> properties (size, spread, motif, contacts, bin,
+source molecules) that survive SDF/extxyz export, plus a <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code> per
+step.</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="usage.html"
+                          title="previous chapter">Usage</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/history.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="usage.html" title="Usage"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">History</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

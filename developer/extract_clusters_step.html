@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>extract_clusters_step package &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Installation" href="../installation.html" />
+    <link rel="prev" title="extract_clusters_step" href="modules.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../installation.html" title="Installation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="modules.html" title="extract_clusters_step"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Developer Guide</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="modules.html" accesskey="U">extract_clusters_step</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step package</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="extract-clusters-step-package">
+<h1>extract_clusters_step package<a class="headerlink" href="#extract-clusters-step-package" title="Link to this heading">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-extract_clusters_step.cluster_sampling">
+<span id="extract-clusters-step-cluster-sampling-module"></span><h2>extract_clusters_step.cluster_sampling module<a class="headerlink" href="#module-extract_clusters_step.cluster_sampling" title="Link to this heading">¶</a></h2>
+<p>Sampling of n-molecule clusters from a (periodic) configuration.</p>
+<p>The pure functions here have no dependence on the SEAMM framework, only on
+numpy/scipy and the duck-typed <code class="docutils literal notranslate"><span class="pre">molsystem</span></code> configuration passed in, so they
+can be unit-tested directly and reused outside a flowchart.</p>
+<p>The approach:</p>
+<ol class="arabic simple">
+<li><p>Find the molecules (by bonds) and build a molecular <strong>contact graph</strong>:
+molecule A is adjacent to B if any <em>contact atom</em> of A is within <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>
+(minimum image) of any contact atom of B.</p></li>
+<li><p>Sample n-mers as <strong>connected subgraphs</strong> of that graph by random frontier
+growth from a random seed molecule. Every member interacts with at least one
+other, and chains, rings and stars all occur – unlike nearest-neighbour
+selection, which only ever yields the most compact cluster.</p></li>
+<li><p>Optionally <strong>stratify</strong> the accepted clusters to be flat in a spread
+coordinate (radius of gyration or largest centroid separation of the
+molecules), with bin edges taken as quantiles of a pilot sample, and
+optionally balance jointly over contact-graph topology (motif).</p></li>
+<li><p>Emit each cluster as an <strong>unwrapped, centred, non-periodic</strong> configuration
+with the molecules intact, a unique name carrying provenance, and optional
+per-configuration properties.</p></li>
+</ol>
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.accepts_topology">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">accepts_topology</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">motifs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordination</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#accepts_topology"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.accepts_topology" title="Link to this definition">¶</a></dt>
+<dd><p>Whether the cluster <code class="docutils literal notranslate"><span class="pre">order</span></code> passes the motif and centre-coordination
+filters. Returns (accepted, motif, n_edges, degrees).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.bond_index_pairs">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">bond_index_pairs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">configuration</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#bond_index_pairs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.bond_index_pairs" title="Link to this definition">¶</a></dt>
+<dd><p>The bonds of a configuration as 0-based atom-index pairs, with orders.</p>
+<p>For a configuration without symmetry operators (the normal case, and every
+non-periodic one) the pairs come straight from the bond table, since
+<code class="docutils literal notranslate"><span class="pre">symmetry.bond_atoms</span></code> is only populated for periodic configurations. For
+a symmetric crystal the symmetry-expanded list is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">pairs</span></code> is a list of (i, j) index tuples; <code class="docutils literal notranslate"><span class="pre">orders</span></code> the matching
+list of bond orders, or None if it could not be matched up.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>(pairs, orders)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.check_bonds">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">check_bonds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">configuration</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#check_bonds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.check_bonds" title="Link to this definition">¶</a></dt>
+<dd><p>Raise if the configuration has no bonds but clearly consists of molecules.</p>
+<p>Molecules are found from the bonds, so a configuration read from a format
+without connectivity (e.g. extended XYZ without bond perception) would be
+treated as one atom per molecule and the “clusters” would silently be
+groups of atoms. Configurations made only of noble-gas atoms or monatomic
+ions are allowed through.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.classify_motif">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">classify_motif</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_edges</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degrees</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#classify_motif"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.classify_motif" title="Link to this definition">¶</a></dt>
+<dd><p>Name the topology of the induced contact graph of an n-mer.</p>
+<p>Only n &lt;= 4 get descriptive names; larger clusters are labelled by edge
+count so they can still be balanced on topology.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Number of molecules.</p></li>
+<li><p><strong>n_edges</strong> (<em>int</em>) – Number of contact edges within the cluster.</p></li>
+<li><p><strong>degrees</strong> (<em>[</em><em>int</em><em>]</em>) – The degree of each molecule within the cluster.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.cluster_motif">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">cluster_motif</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#cluster_motif"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.cluster_motif" title="Link to this definition">¶</a></dt>
+<dd><p>The motif label, edge count and degree list of the cluster <code class="docutils literal notranslate"><span class="pre">order</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.cluster_summary">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">cluster_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">records</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#cluster_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.cluster_summary" title="Link to this definition">¶</a></dt>
+<dd><p>Tabulate how a set of extracted n-mers is distributed over motif and
+spread bin – the quick check that the set is actually balanced.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>records</strong> (<em>[</em><em>dict</em><em>]</em>) – The records from <a class="reference internal" href="#extract_clusters_step.cluster_sampling.extract_nmers" title="extract_clusters_step.cluster_sampling.extract_nmers"><code class="xref py py-func docutils literal notranslate"><span class="pre">extract_nmers()</span></code></a>.</p></li>
+<li><p><strong>edges</strong> (<em>[</em><em>float</em><em>] or </em><em>None</em>) – The bin edges, printed as a final line if given.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.extract_nmers">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">extract_nmers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">configuration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">contact_elements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spread_metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rg'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spread_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">balance_motifs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">motifs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordination</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">system</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">system_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'clusters'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_attempts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">store_properties</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seen</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#extract_nmers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.extract_nmers" title="Link to this definition">¶</a></dt>
+<dd><p>Extract n-molecule clusters from a (periodic) configuration.</p>
+<p>The clusters are returned as unwrapped, non-periodic configurations
+suitable for cluster QM.</p>
+<p>Selection is by <em>connected subgraph</em> of a molecular contact graph, not by
+nearest neighbours: every molecule in a returned n-mer is within
+<code class="docutils literal notranslate"><span class="pre">cutoff</span></code> of at least one other, but chains, rings and stars all occur,
+and seeds are random so a single frame yields many distinct clusters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>configuration</strong> (<em>molsystem _Configuration</em>) – Source configuration (periodic or not). Molecules are found by bonds.</p></li>
+<li><p><strong>n</strong> (<em>int</em>) – Molecules per cluster (&gt;= 2).</p></li>
+<li><p><strong>n_samples</strong> (<em>int</em>) – Target number of clusters (fewer if the pool or quotas run out).</p></li>
+<li><p><strong>cutoff</strong> (<em>float</em>) – Contact distance (Å) defining the neighbour graph. 3.5 with
+<code class="docutils literal notranslate"><span class="pre">contact_elements=[&quot;O&quot;]</span></code> is the usual H-bond criterion for water.</p></li>
+<li><p><strong>contact_elements</strong> (<em>list</em><em>[</em><em>str</em><em>] or </em><em>None</em>) – Elements whose atoms define contact; None uses all atoms.</p></li>
+<li><p><strong>spread_metric</strong> (<em>&quot;rg&quot;</em><em> | </em><em>&quot;dmax&quot;</em>) – Compactness coordinate used for stratification: radius of gyration of
+the molecular centroids, or the largest centroid-centroid distance.</p></li>
+<li><p><strong>spread_bins</strong> (<em>int</em><em>, </em><em>sequence</em><em> of </em><em>float</em><em>, or </em><em>None</em>) – Bin edges on the spread coordinate. An int asks for that many
+equal-quantile bins, with edges taken from an unstratified pilot
+sample of the same frame – the usual choice, since sensible edges
+depend on n and on the system. If given, acceptance is quota-
+limited so bins fill roughly evenly (flat-in-spread, analogous to the
+dimer builder’s flat-in-energy selection). Samples outside the edges
+are rejected. None disables stratification.</p></li>
+<li><p><strong>balance_motifs</strong> (<em>bool</em>) – Also balance across contact-graph topology (chain/ring/star/…),
+jointly with the spread bins.</p></li>
+<li><p><strong>motifs</strong> (<em>iterable</em><em> of </em><em>str</em><em> or </em><em>None</em>) – Accept only clusters whose contact-graph motif is one of these (see
+<a class="reference internal" href="#extract_clusters_step.cluster_sampling.motif_names" title="extract_clusters_step.cluster_sampling.motif_names"><code class="xref py py-func docutils literal notranslate"><span class="pre">motif_names()</span></code></a>); None accepts every motif. Rejected candidates
+count against the attempt budget, so rare motifs (rings are a few
+percent of water trimers) may need a larger budget.</p></li>
+<li><p><strong>coordination</strong> (<em>iterable</em><em> of </em><em>int</em><em> or </em><em>None</em>) – Accept only clusters whose most-connected molecule has one of these
+numbers of contacts within the cluster (its degree in the induced
+contact graph) – e.g. <code class="docutils literal notranslate"><span class="pre">[3]</span></code> for star tetramers, <code class="docutils literal notranslate"><span class="pre">[4]</span></code> for a
+complete first shell. None accepts any. Stored on every cluster as the
+<code class="docutils literal notranslate"><span class="pre">centre</span> <span class="pre">coordination</span></code> property.</p></li>
+<li><p><strong>system</strong> (<em>molsystem _System</em><em> or </em><em>None</em>) – Destination system. If None, <code class="docutils literal notranslate"><span class="pre">system_name</span></code> is looked up in the
+configuration’s database and created if needed.</p></li>
+<li><p><strong>system_name</strong> (<em>str</em>) – Destination system name, used when <code class="docutils literal notranslate"><span class="pre">system</span></code> is None.</p></li>
+<li><p><strong>name_prefix</strong> (<em>str</em>) – Prefix (e.g. a frame label) for the configuration names, which are
+<code class="docutils literal notranslate"><span class="pre">f&quot;{name_prefix}{seed}_{m1-m2-...}&quot;</span></code> and unique within a frame.</p></li>
+<li><p><strong>max_attempts</strong> (<em>int</em><em> or </em><em>None</em>) – Sampling attempts before giving up (default 50 * n_samples).</p></li>
+<li><p><strong>rng</strong> (<em>int</em><em>, </em><em>numpy Generator</em><em> or </em><em>None</em>) – Seed / generator for reproducibility.</p></li>
+<li><p><strong>store_properties</strong> (<em>bool</em>) – Store size, spread, motif, edge count, and source molecule list as
+<code class="docutils literal notranslate"><span class="pre">*#ExtractClusters#scan</span></code> properties on each configuration.</p></li>
+<li><p><strong>seen</strong> (<em>set</em><em> or </em><em>None</em>) – Molecule sets already emitted (as frozensets); updated in place. Pass
+the same set across calls on the same frame to avoid duplicates.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New configurations; one metadata dict per cluster with keys
+<code class="docutils literal notranslate"><span class="pre">name,</span> <span class="pre">n,</span> <span class="pre">molecules,</span> <span class="pre">seed,</span> <span class="pre">order,</span> <span class="pre">rg,</span> <span class="pre">dmax,</span> <span class="pre">n_edges,</span> <span class="pre">degrees,</span> <span class="pre">motif,</span>
+<span class="pre">bin</span></code>; and an <code class="docutils literal notranslate"><span class="pre">info</span></code> dict with <code class="docutils literal notranslate"><span class="pre">edges</span></code> (the bin edges used, or
+None), <code class="docutils literal notranslate"><span class="pre">attempts</span></code>, <code class="docutils literal notranslate"><span class="pre">per_key</span></code> quota, <code class="docutils literal notranslate"><span class="pre">n_molecules</span></code> and
+<code class="docutils literal notranslate"><span class="pre">n_contacts</span></code> of the frame’s graph, and <code class="docutils literal notranslate"><span class="pre">warning</span></code> (a message or
+None) if fewer than requested were produced.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>(configurations, records, info)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.grow_connected">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">grow_connected</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#grow_connected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.grow_connected" title="Link to this definition">¶</a></dt>
+<dd><p>Grow a connected n-molecule subgraph from <code class="docutils literal notranslate"><span class="pre">seed</span></code>.</p>
+<p>Random frontier expansion: at each step a molecule adjacent to the current
+cluster is chosen uniformly and attached through a random one of its
+neighbours already inside. Uniform choice from the frontier is a cheap
+approximation to uniform connected-subgraph sampling; it mildly favours
+high-degree regions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">order</span></code> is the list of molecule indices in growth order; <code class="docutils literal notranslate"><span class="pre">parent</span></code>
+maps each to the molecule it attached through (None for the seed).
+None if the connected component is smaller than n.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>(order, parent) or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.make_put_property">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">make_put_property</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#ExtractClusters#scan'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#make_put_property"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.make_put_property" title="Link to this definition">¶</a></dt>
+<dd><p>Return a closure storing <code class="docutils literal notranslate"><span class="pre">name+tag</span></code> properties on <code class="docutils literal notranslate"><span class="pre">conf</span></code>.</p>
+<p>Defines the property first if the database lacks it (the properties are
+normally pre-registered from <code class="docutils literal notranslate"><span class="pre">data/properties.csv</span></code>).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.molecule_neighbour_graph">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">molecule_neighbour_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frac_atoms</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_mol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">contact_mask</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">periodic</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cell_parameters</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#molecule_neighbour_graph"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.molecule_neighbour_graph" title="Link to this definition">¶</a></dt>
+<dd><p>Molecule-level adjacency from atom contacts.</p>
+<p>A~B if any contact atom of A is within <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (Å, minimum image) of any
+contact atom of B.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frac_atoms</strong> (<em>(</em><em>N</em><em>,</em><em>3</em><em>) </em><em>ndarray</em>) – Fractional coordinates (Cartesian if not periodic).</p></li>
+<li><p><strong>atom_mol</strong> (<em>(</em><em>N</em><em>,</em><em>) </em><em>ndarray</em><em> of </em><em>int</em>) – Molecule index of each atom.</p></li>
+<li><p><strong>contact_mask</strong> (<em>(</em><em>N</em><em>,</em><em>) </em><em>ndarray</em><em> of </em><em>bool</em>) – Which atoms define contact.</p></li>
+<li><p><strong>T</strong> (<em>(</em><em>3</em><em>,</em><em>3</em><em>) </em><em>ndarray</em>) – Fractional-&gt;Cartesian transform (<code class="docutils literal notranslate"><span class="pre">xyz</span> <span class="pre">=</span> <span class="pre">uvw</span> <span class="pre">&#64;</span> <span class="pre">T</span></code>); identity if not
+periodic.</p></li>
+<li><p><strong>cutoff</strong> (<em>float</em>) – Contact distance, Å.</p></li>
+<li><p><strong>periodic</strong> (<em>bool</em>)</p></li>
+<li><p><strong>cell_parameters</strong> (<em>(</em><em>a</em><em>, </em><em>b</em><em>, </em><em>c</em><em>, </em><em>alpha</em><em>, </em><em>beta</em><em>, </em><em>gamma</em><em>) or </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Adjacency lists keyed by molecule index. Molecules with no contacts
+are absent.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict[int, set[int]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.motif_names">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">motif_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#motif_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.motif_names" title="Link to this definition">¶</a></dt>
+<dd><p>The motif labels <a class="reference internal" href="#extract_clusters_step.cluster_sampling.classify_motif" title="extract_clusters_step.cluster_sampling.classify_motif"><code class="xref py py-func docutils literal notranslate"><span class="pre">classify_motif()</span></code></a> can produce for n molecules.</p>
+<p>Named motifs for n &lt;= 4; for larger n the labels are <code class="docutils literal notranslate"><span class="pre">e&lt;edges&gt;</span></code> for every
+possible edge count of a connected graph, from n-1 (a tree) to n(n-1)/2.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.pilot_spreads">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">pilot_spreads</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frac_centroids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">periodic</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spread_metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_mol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_pilot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">motifs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordination</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#pilot_spreads"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.pilot_spreads" title="Link to this definition">¶</a></dt>
+<dd><p>Spread values of an unstratified pilot sample, used to place bin edges.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">motifs</span></code> or <code class="docutils literal notranslate"><span class="pre">coordination</span></code> is given only clusters passing those
+filters are sampled, so the bin edges describe the distribution the
+extraction will actually draw from (ring trimers, say, are compact and never
+reach the widest all-motif bin).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="extract_clusters_step.cluster_sampling.unwrap_shifts">
+<span class="sig-prename descclassname"><span class="pre">extract_clusters_step.cluster_sampling.</span></span><span class="sig-name descname"><span class="pre">unwrap_shifts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frac_centroids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">periodic</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/cluster_sampling.html#unwrap_shifts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.cluster_sampling.unwrap_shifts" title="Link to this definition">¶</a></dt>
+<dd><p>Integer lattice shifts making each molecule contiguous with its parent.</p>
+<p>Each molecule is shifted to the image nearest the neighbour it attached
+through, so the whole cluster is contiguous in space.</p>
+</dd></dl>
+
+</section>
+<section id="module-extract_clusters_step.extract_clusters">
+<span id="extract-clusters-step-extract-clusters-module"></span><h2>extract_clusters_step.extract_clusters module<a class="headerlink" href="#module-extract_clusters_step.extract_clusters" title="Link to this heading">¶</a></h2>
+<p>Non-graphical part of the Extract Clusters step in a SEAMM flowchart</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">extract_clusters_step.extract_clusters.</span></span><span class="sig-name descname"><span class="pre">ExtractClusters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flowchart</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Extract</span> <span class="pre">Clusters'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extension</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;Logger</span> <span class="pre">extract_clusters_step.extract_clusters</span> <span class="pre">(WARNING)&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters.html#ExtractClusters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Node</span></code></p>
+<p>The non-graphical part of a Extract Clusters step in a flowchart.</p>
+<p>Extracts n-molecule clusters (trimers, tetramers, … larger clusters) from
+the current, typically periodic, condensed-phase configuration as unwrapped,
+non-periodic configurations in a new system, tagged with provenance. The
+clusters are connected subgraphs of the molecular contact graph, optionally
+stratified to be flat in a spread coordinate and balanced over topology.
+See <a class="reference internal" href="#module-extract_clusters_step.cluster_sampling" title="extract_clusters_step.cluster_sampling"><code class="xref py py-mod docutils literal notranslate"><span class="pre">extract_clusters_step.cluster_sampling</span></code></a> for the algorithm.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.parser">
+<span class="sig-name descname"><span class="pre">parser</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.parser" title="Link to this definition">¶</a></dt>
+<dd><p>The parser object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>configargparse.ArgParser</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.options">
+<span class="sig-name descname"><span class="pre">options</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.options" title="Link to this definition">¶</a></dt>
+<dd><p>It contains a two item tuple containing the populated namespace and the
+list of remaining argument strings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.parameters">
+<span class="sig-name descname"><span class="pre">parameters</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.parameters" title="Link to this definition">¶</a></dt>
+<dd><p>The control parameters for Extract Clusters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters" title="extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters">ExtractClustersParameters</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters</span></code>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtractClustersParameters</span></code></p>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.analyze">
+<span class="sig-name descname"><span class="pre">analyze</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">indent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">system</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sources</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">motifs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordination</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters.html#ExtractClusters.analyze"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.analyze" title="Link to this definition">¶</a></dt>
+<dd><p>Report the extracted clusters to step.out.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>indent</strong> (<em>str</em>) – An extra indentation for the output</p></li>
+<li><p><strong>P</strong> (<em>dict</em>) – The control parameters.</p></li>
+<li><p><strong>results</strong> (<em>[</em><em>(</em><em>n</em><em>, </em><em>configurations</em><em>, </em><em>records</em><em>, </em><em>info</em><em>)</em><em>]</em>) – The output of <code class="xref py py-func docutils literal notranslate"><span class="pre">extract_nmers()</span></code> for each cluster size.</p></li>
+<li><p><strong>system</strong> (<em>molsystem _System</em>) – The destination system.</p></li>
+<li><p><strong>source</strong> (<em>molsystem _Configuration</em>) – The source configuration.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.description_text">
+<span class="sig-name descname"><span class="pre">description_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters.html#ExtractClusters.description_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.description_text" title="Link to this definition">¶</a></dt>
+<dd><p>Create the text description of what this step will do.
+The dictionary of control values is passed in as P so that
+the code can test values, etc.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>P</strong> (<em>dict</em>) – An optional dictionary of the current values of the control
+parameters.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A description of the current step.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.git_revision">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">git_revision</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.git_revision" title="Link to this definition">¶</a></dt>
+<dd><p>The git version of this module.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.property_tag">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">property_tag</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.property_tag" title="Link to this definition">¶</a></dt>
+<dd><p>The suffix of the per-cluster properties, ‘#ExtractClusters#scan’.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters.html#ExtractClusters.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.run" title="Link to this definition">¶</a></dt>
+<dd><p>Run a Extract Clusters step.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The next node object in the flowchart.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>seamm.Node</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters.ExtractClusters.version">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">version</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters.ExtractClusters.version" title="Link to this definition">¶</a></dt>
+<dd><p>The semantic version of this module.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-extract_clusters_step.extract_clusters_parameters">
+<span id="extract-clusters-step-extract-clusters-parameters-module"></span><h2>extract_clusters_step.extract_clusters_parameters module<a class="headerlink" href="#module-extract_clusters_step.extract_clusters_parameters" title="Link to this heading">¶</a></h2>
+<p>Control parameters for the Extract Clusters step in a SEAMM flowchart</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">extract_clusters_step.extract_clusters_parameters.</span></span><span class="sig-name descname"><span class="pre">ExtractClustersParameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">defaults</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters_parameters.html#ExtractClustersParameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Parameters</span></code></p>
+<p>The control parameters for Extract Clusters.</p>
+<p>The keys are the parameters for this plug-in; each value is a dictionary
+describing that parameter (default, kind, units, enumeration, format,
+description, help).</p>
+<dl class="simple">
+<dt>parameters<span class="classifier">{str: {str: str}}</span></dt><dd><p>A dictionary containing the parameters for the current step.</p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtractClusters</span></code>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters</span></code>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtractClustersStep</span></code></p>
+</div>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters.parameters">
+<span class="sig-name descname"><span class="pre">parameters</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'attempts</span> <span class="pre">per</span> <span class="pre">cluster':</span> <span class="pre">{'default':</span> <span class="pre">50,</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Attempts</span> <span class="pre">per</span> <span class="pre">cluster:',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">'The</span> <span class="pre">sampling</span> <span class="pre">budget:</span> <span class="pre">the</span> <span class="pre">total</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">attempts</span> <span class="pre">is</span> <span class="pre">this</span> <span class="pre">times</span> <span class="pre">the</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">clusters</span> <span class="pre">requested.</span> <span class="pre">Attempts</span> <span class="pre">that</span> <span class="pre">duplicate</span> <span class="pre">an</span> <span class="pre">earlier</span> <span class="pre">cluster,</span> <span class="pre">fall</span> <span class="pre">outside</span> <span class="pre">the</span> <span class="pre">bin</span> <span class="pre">edges,</span> <span class="pre">or</span> <span class="pre">land</span> <span class="pre">in</span> <span class="pre">a</span> <span class="pre">full</span> <span class="pre">quota</span> <span class="pre">cell</span> <span class="pre">are</span> <span class="pre">rejected</span> <span class="pre">and</span> <span class="pre">count</span> <span class="pre">against</span> <span class="pre">the</span> <span class="pre">budget.',</span> <span class="pre">'kind':</span> <span class="pre">'integer'},</span> <span class="pre">'balance</span> <span class="pre">motifs':</span> <span class="pre">{'default':</span> <span class="pre">'no',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Balance</span> <span class="pre">motifs:',</span> <span class="pre">'enumeration':</span> <span class="pre">('yes',</span> <span class="pre">'no'),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">'Also</span> <span class="pre">balance</span> <span class="pre">the</span> <span class="pre">set</span> <span class="pre">over</span> <span class="pre">the</span> <span class="pre">topology</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">contact</span> <span class="pre">graph</span> <span class="pre">within</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">(chain</span> <span class="pre">/</span> <span class="pre">ring</span> <span class="pre">/</span> <span class="pre">star</span> <span class="pre">/</span> <span class="pre">...,</span> <span class="pre">or</span> <span class="pre">the</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">contacts</span> <span class="pre">for</span> <span class="pre">clusters</span> <span class="pre">of</span> <span class="pre">more</span> <span class="pre">than</span> <span class="pre">four</span> <span class="pre">molecules),</span> <span class="pre">jointly</span> <span class="pre">with</span> <span class="pre">the</span> <span class="pre">spread</span> <span class="pre">bins.</span> <span class="pre">Topology</span> <span class="pre">and</span> <span class="pre">spread</span> <span class="pre">are</span> <span class="pre">correlated</span> <span class="pre">--</span> <span class="pre">rings</span> <span class="pre">only</span> <span class="pre">exist</span> <span class="pre">compact</span> <span class="pre">--</span> <span class="pre">so</span> <span class="pre">some</span> <span class="pre">cells</span> <span class="pre">cannot</span> <span class="pre">fill</span> <span class="pre">and</span> <span class="pre">the</span> <span class="pre">set</span> <span class="pre">will</span> <span class="pre">come</span> <span class="pre">up</span> <span class="pre">short</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">requested</span> <span class="pre">number;</span> <span class="pre">the</span> <span class="pre">summary</span> <span class="pre">shows</span> <span class="pre">which.',</span> <span class="pre">'kind':</span> <span class="pre">'boolean'},</span> <span class="pre">'bin</span> <span class="pre">edges':</span> <span class="pre">{'default':</span> <span class="pre">'',</span> <span class="pre">'default_units':</span> <span class="pre">'Å',</span> <span class="pre">'description':</span> <span class="pre">'Bin</span> <span class="pre">edges:',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;The</span> <span class="pre">bin</span> <span class="pre">edges</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">spread</span> <span class="pre">metric,</span> <span class="pre">in</span> <span class="pre">Å,</span> <span class="pre">as</span> <span class="pre">an</span> <span class="pre">increasing</span> <span class="pre">comma-</span> <span class="pre">or</span> <span class="pre">space-separated</span> <span class="pre">list,</span> <span class="pre">e.g.</span> <span class="pre">'1.6,</span> <span class="pre">2.0,</span> <span class="pre">2.5,</span> <span class="pre">3.5'.</span> <span class="pre">Clusters</span> <span class="pre">outside</span> <span class="pre">the</span> <span class="pre">outer</span> <span class="pre">edges</span> <span class="pre">are</span> <span class="pre">rejected.</span> <span class="pre">Note</span> <span class="pre">that</span> <span class="pre">sensible</span> <span class="pre">edges</span> <span class="pre">depend</span> <span class="pre">strongly</span> <span class="pre">on</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">size</span> <span class="pre">and</span> <span class="pre">the</span> <span class="pre">system;</span> <span class="pre">'quantile</span> <span class="pre">bins'</span> <span class="pre">is</span> <span class="pre">usually</span> <span class="pre">the</span> <span class="pre">better</span> <span class="pre">choice.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'centre</span> <span class="pre">coordination':</span> <span class="pre">{'default':</span> <span class="pre">'any',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Centre</span> <span class="pre">coordination:',</span> <span class="pre">'enumeration':</span> <span class="pre">('any',),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;Accept</span> <span class="pre">only</span> <span class="pre">clusters</span> <span class="pre">whose</span> <span class="pre">most-connected</span> <span class="pre">molecule</span> <span class="pre">has</span> <span class="pre">this</span> <span class="pre">many</span> <span class="pre">contacts</span> <span class="pre">within</span> <span class="pre">the</span> <span class="pre">cluster:</span> <span class="pre">a</span> <span class="pre">value</span> <span class="pre">or</span> <span class="pre">SEAMM</span> <span class="pre">list</span> <span class="pre">such</span> <span class="pre">as</span> <span class="pre">'3'</span> <span class="pre">(star</span> <span class="pre">tetramers),</span> <span class="pre">'4'</span> <span class="pre">(a</span> <span class="pre">complete</span> <span class="pre">first</span> <span class="pre">shell)</span> <span class="pre">or</span> <span class="pre">'3:4'.</span> <span class="pre">'any'</span> <span class="pre">accepts</span> <span class="pre">all.</span> <span class="pre">Applied</span> <span class="pre">at</span> <span class="pre">acceptance,</span> <span class="pre">so</span> <span class="pre">the</span> <span class="pre">set</span> <span class="pre">contains</span> <span class="pre">only</span> <span class="pre">such</span> <span class="pre">clusters</span> <span class="pre">instead</span> <span class="pre">of</span> <span class="pre">being</span> <span class="pre">post-filtered;</span> <span class="pre">the</span> <span class="pre">value</span> <span class="pre">is</span> <span class="pre">also</span> <span class="pre">stored</span> <span class="pre">on</span> <span class="pre">every</span> <span class="pre">cluster</span> <span class="pre">as</span> <span class="pre">the</span> <span class="pre">'centre</span> <span class="pre">coordination'</span> <span class="pre">property.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'cluster</span> <span class="pre">sizes':</span> <span class="pre">{'default':</span> <span class="pre">'3',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Cluster</span> <span class="pre">sizes</span> <span class="pre">(molecules):',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;The</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">molecules</span> <span class="pre">per</span> <span class="pre">cluster.</span> <span class="pre">A</span> <span class="pre">comma-</span> <span class="pre">or</span> <span class="pre">space-separated</span> <span class="pre">list,</span> <span class="pre">e.g.</span> <span class="pre">'3,</span> <span class="pre">4',</span> <span class="pre">extracts</span> <span class="pre">a</span> <span class="pre">set</span> <span class="pre">of</span> <span class="pre">each</span> <span class="pre">size</span> <span class="pre">from</span> <span class="pre">the</span> <span class="pre">same</span> <span class="pre">frame.</span> <span class="pre">Each</span> <span class="pre">must</span> <span class="pre">be</span> <span class="pre">at</span> <span class="pre">least</span> <span class="pre">2.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'contact</span> <span class="pre">cutoff':</span> <span class="pre">{'default':</span> <span class="pre">3.5,</span> <span class="pre">'default_units':</span> <span class="pre">'Å',</span> <span class="pre">'description':</span> <span class="pre">'Contact</span> <span class="pre">cutoff:',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'.2f',</span> <span class="pre">'help_text':</span> <span class="pre">'Two</span> <span class="pre">molecules</span> <span class="pre">are</span> <span class="pre">in</span> <span class="pre">contact</span> <span class="pre">if</span> <span class="pre">any</span> <span class="pre">of</span> <span class="pre">their</span> <span class="pre">contact</span> <span class="pre">atoms</span> <span class="pre">are</span> <span class="pre">within</span> <span class="pre">this</span> <span class="pre">distance</span> <span class="pre">(minimum</span> <span class="pre">image).</span> <span class="pre">A</span> <span class="pre">cluster</span> <span class="pre">is</span> <span class="pre">a</span> <span class="pre">connected</span> <span class="pre">set</span> <span class="pre">of</span> <span class="pre">molecules</span> <span class="pre">under</span> <span class="pre">this</span> <span class="pre">criterion.</span> <span class="pre">3.5</span> <span class="pre">Å</span> <span class="pre">between</span> <span class="pre">oxygens</span> <span class="pre">is</span> <span class="pre">the</span> <span class="pre">usual</span> <span class="pre">hydrogen-bond</span> <span class="pre">criterion</span> <span class="pre">for</span> <span class="pre">water.',</span> <span class="pre">'kind':</span> <span class="pre">'float'},</span> <span class="pre">'contact</span> <span class="pre">elements':</span> <span class="pre">{'default':</span> <span class="pre">'all',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Contact</span> <span class="pre">elements:',</span> <span class="pre">'enumeration':</span> <span class="pre">('all',),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;The</span> <span class="pre">elements</span> <span class="pre">whose</span> <span class="pre">atoms</span> <span class="pre">define</span> <span class="pre">contact,</span> <span class="pre">e.g.</span> <span class="pre">'O'</span> <span class="pre">or</span> <span class="pre">'O,</span> <span class="pre">N'.</span> <span class="pre">'all'</span> <span class="pre">uses</span> <span class="pre">every</span> <span class="pre">atom.</span> <span class="pre">Restricting</span> <span class="pre">to</span> <span class="pre">the</span> <span class="pre">heavy</span> <span class="pre">atoms</span> <span class="pre">that</span> <span class="pre">form</span> <span class="pre">the</span> <span class="pre">intermolecular</span> <span class="pre">contacts</span> <span class="pre">(e.g.</span> <span class="pre">O</span> <span class="pre">for</span> <span class="pre">water)</span> <span class="pre">makes</span> <span class="pre">the</span> <span class="pre">cutoff</span> <span class="pre">meaningful</span> <span class="pre">and</span> <span class="pre">the</span> <span class="pre">graph</span> <span class="pre">cheaper</span> <span class="pre">to</span> <span class="pre">build.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'make</span> <span class="pre">current':</span> <span class="pre">{'default':</span> <span class="pre">'yes',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Make</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">system</span> <span class="pre">current:',</span> <span class="pre">'enumeration':</span> <span class="pre">('yes',</span> <span class="pre">'no'),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;Whether</span> <span class="pre">to</span> <span class="pre">make</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">system</span> <span class="pre">(and</span> <span class="pre">its</span> <span class="pre">first</span> <span class="pre">configuration)</span> <span class="pre">the</span> <span class="pre">current</span> <span class="pre">one,</span> <span class="pre">so</span> <span class="pre">that</span> <span class="pre">a</span> <span class="pre">following</span> <span class="pre">Write</span> <span class="pre">Structure</span> <span class="pre">step</span> <span class="pre">writes</span> <span class="pre">the</span> <span class="pre">clusters.</span> <span class="pre">Choose</span> <span class="pre">'no'</span> <span class="pre">when</span> <span class="pre">the</span> <span class="pre">source</span> <span class="pre">must</span> <span class="pre">remain</span> <span class="pre">current.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'boolean'},</span> <span class="pre">'motifs':</span> <span class="pre">{'default':</span> <span class="pre">'any',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Restrict</span> <span class="pre">to</span> <span class="pre">motifs:',</span> <span class="pre">'enumeration':</span> <span class="pre">('any',),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;Accept</span> <span class="pre">only</span> <span class="pre">clusters</span> <span class="pre">whose</span> <span class="pre">contact-graph</span> <span class="pre">topology</span> <span class="pre">is</span> <span class="pre">one</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">given</span> <span class="pre">motifs,</span> <span class="pre">e.g.</span> <span class="pre">'ring',</span> <span class="pre">or</span> <span class="pre">'ring,</span> <span class="pre">star'</span> <span class="pre">for</span> <span class="pre">several.</span> <span class="pre">'any'</span> <span class="pre">accepts</span> <span class="pre">all.</span> <span class="pre">Trimers</span> <span class="pre">have</span> <span class="pre">'chain'</span> <span class="pre">and</span> <span class="pre">'ring';</span> <span class="pre">tetramers</span> <span class="pre">'chain',</span> <span class="pre">'star',</span> <span class="pre">'ring',</span> <span class="pre">'paw',</span> <span class="pre">'diamond'</span> <span class="pre">and</span> <span class="pre">'K4';</span> <span class="pre">larger</span> <span class="pre">clusters</span> <span class="pre">are</span> <span class="pre">labelled</span> <span class="pre">'e&lt;n&gt;'</span> <span class="pre">by</span> <span class="pre">their</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">contacts.</span> <span class="pre">Rare</span> <span class="pre">motifs</span> <span class="pre">use</span> <span class="pre">up</span> <span class="pre">the</span> <span class="pre">attempt</span> <span class="pre">budget</span> <span class="pre">quickly,</span> <span class="pre">so</span> <span class="pre">raise</span> <span class="pre">'Attempts</span> <span class="pre">per</span> <span class="pre">cluster'</span> <span class="pre">if</span> <span class="pre">the</span> <span class="pre">set</span> <span class="pre">comes</span> <span class="pre">up</span> <span class="pre">short.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'name</span> <span class="pre">prefix':</span> <span class="pre">{'default':</span> <span class="pre">'from</span> <span class="pre">configuration',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Configuration</span> <span class="pre">name</span> <span class="pre">prefix:',</span> <span class="pre">'enumeration':</span> <span class="pre">('from</span> <span class="pre">configuration',</span> <span class="pre">'none'),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;Each</span> <span class="pre">cluster</span> <span class="pre">is</span> <span class="pre">named</span> <span class="pre">'&lt;prefix&gt;&lt;seed&gt;_&lt;m1-m2-...&gt;'</span> <span class="pre">from</span> <span class="pre">the</span> <span class="pre">source</span> <span class="pre">molecules,</span> <span class="pre">which</span> <span class="pre">is</span> <span class="pre">unique</span> <span class="pre">within</span> <span class="pre">a</span> <span class="pre">frame.</span> <span class="pre">The</span> <span class="pre">prefix</span> <span class="pre">keeps</span> <span class="pre">the</span> <span class="pre">names</span> <span class="pre">unique</span> <span class="pre">across</span> <span class="pre">frames:</span> <span class="pre">'from</span> <span class="pre">configuration'</span> <span class="pre">uses</span> <span class="pre">'&lt;source</span> <span class="pre">configuration</span> <span class="pre">name&gt;_'</span> <span class="pre">(the</span> <span class="pre">default,</span> <span class="pre">and</span> <span class="pre">the</span> <span class="pre">right</span> <span class="pre">choice</span> <span class="pre">when</span> <span class="pre">several</span> <span class="pre">frames</span> <span class="pre">are</span> <span class="pre">selected);</span> <span class="pre">'none'</span> <span class="pre">uses</span> <span class="pre">no</span> <span class="pre">prefix;</span> <span class="pre">any</span> <span class="pre">other</span> <span class="pre">text</span> <span class="pre">is</span> <span class="pre">used</span> <span class="pre">literally</span> <span class="pre">(a</span> <span class="pre">variable</span> <span class="pre">such</span> <span class="pre">as</span> <span class="pre">'$frame_'</span> <span class="pre">works).&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'number</span> <span class="pre">of</span> <span class="pre">bins':</span> <span class="pre">{'default':</span> <span class="pre">3,</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Number</span> <span class="pre">of</span> <span class="pre">bins:',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">'The</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">equal-quantile</span> <span class="pre">bins</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">spread</span> <span class="pre">metric.</span> <span class="pre">The</span> <span class="pre">clusters</span> <span class="pre">are</span> <span class="pre">accepted</span> <span class="pre">so</span> <span class="pre">that</span> <span class="pre">the</span> <span class="pre">bins</span> <span class="pre">fill</span> <span class="pre">roughly</span> <span class="pre">evenly.',</span> <span class="pre">'kind':</span> <span class="pre">'integer'},</span> <span class="pre">'number</span> <span class="pre">of</span> <span class="pre">clusters':</span> <span class="pre">{'default':</span> <span class="pre">50,</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Clusters</span> <span class="pre">per</span> <span class="pre">size:',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">'How</span> <span class="pre">many</span> <span class="pre">clusters</span> <span class="pre">of</span> <span class="pre">each</span> <span class="pre">size</span> <span class="pre">to</span> <span class="pre">extract</span> <span class="pre">from</span> <span class="pre">each</span> <span class="pre">selected</span> <span class="pre">configuration</span> <span class="pre">(frame).</span> <span class="pre">Fewer</span> <span class="pre">are</span> <span class="pre">produced</span> <span class="pre">if</span> <span class="pre">the</span> <span class="pre">configuration</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">contain</span> <span class="pre">enough</span> <span class="pre">distinct</span> <span class="pre">connected</span> <span class="pre">clusters,</span> <span class="pre">or</span> <span class="pre">if</span> <span class="pre">stratification</span> <span class="pre">quotas</span> <span class="pre">cannot</span> <span class="pre">fill.',</span> <span class="pre">'kind':</span> <span class="pre">'integer'},</span> <span class="pre">'random</span> <span class="pre">seed':</span> <span class="pre">{'default':</span> <span class="pre">'random',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Random</span> <span class="pre">seed:',</span> <span class="pre">'enumeration':</span> <span class="pre">('random',),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;The</span> <span class="pre">seed</span> <span class="pre">for</span> <span class="pre">the</span> <span class="pre">random-number</span> <span class="pre">generator.</span> <span class="pre">Use</span> <span class="pre">'random'</span> <span class="pre">for</span> <span class="pre">a</span> <span class="pre">fresh</span> <span class="pre">seed,</span> <span class="pre">or</span> <span class="pre">an</span> <span class="pre">integer</span> <span class="pre">for</span> <span class="pre">a</span> <span class="pre">reproducible</span> <span class="pre">selection.</span> <span class="pre">The</span> <span class="pre">seed</span> <span class="pre">actually</span> <span class="pre">used</span> <span class="pre">is</span> <span class="pre">always</span> <span class="pre">printed</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">output,</span> <span class="pre">so</span> <span class="pre">a</span> <span class="pre">'random'</span> <span class="pre">run</span> <span class="pre">can</span> <span class="pre">be</span> <span class="pre">reproduced</span> <span class="pre">by</span> <span class="pre">entering</span> <span class="pre">that</span> <span class="pre">value</span> <span class="pre">here.</span> <span class="pre">A</span> <span class="pre">supplementary</span> <span class="pre">run</span> <span class="pre">over</span> <span class="pre">the</span> <span class="pre">same</span> <span class="pre">frames</span> <span class="pre">must</span> <span class="pre">use</span> <span class="pre">a</span> <span class="pre">DIFFERENT</span> <span class="pre">seed,</span> <span class="pre">or</span> <span class="pre">it</span> <span class="pre">will</span> <span class="pre">largely</span> <span class="pre">regenerate</span> <span class="pre">the</span> <span class="pre">same</span> <span class="pre">clusters.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'source</span> <span class="pre">configuration</span> <span class="pre">name':</span> <span class="pre">{'default':</span> <span class="pre">'',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'s',</span> <span class="pre">'help_text':</span> <span class="pre">'The</span> <span class="pre">configuration</span> <span class="pre">name,</span> <span class="pre">wildcard</span> <span class="pre">pattern</span> <span class="pre">or</span> <span class="pre">regular</span> <span class="pre">expression.',</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'source</span> <span class="pre">configurations':</span> <span class="pre">{'default':</span> <span class="pre">'current',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Configurations:',</span> <span class="pre">'enumeration':</span> <span class="pre">('current',</span> <span class="pre">'all',</span> <span class="pre">'last',</span> <span class="pre">'first',</span> <span class="pre">'name</span> <span class="pre">is',</span> <span class="pre">'name</span> <span class="pre">matches',</span> <span class="pre">'name</span> <span class="pre">regexp'),</span> <span class="pre">'format_string':</span> <span class="pre">'s',</span> <span class="pre">'help_text':</span> <span class="pre">'Which</span> <span class="pre">configurations</span> <span class="pre">of</span> <span class="pre">each</span> <span class="pre">selected</span> <span class="pre">system</span> <span class="pre">to</span> <span class="pre">use:</span> <span class="pre">its</span> <span class="pre">current</span> <span class="pre">configuration,</span> <span class="pre">all</span> <span class="pre">of</span> <span class="pre">them,</span> <span class="pre">the</span> <span class="pre">last</span> <span class="pre">or</span> <span class="pre">first,</span> <span class="pre">or</span> <span class="pre">those</span> <span class="pre">whose</span> <span class="pre">name</span> <span class="pre">is</span> <span class="pre">/</span> <span class="pre">matches</span> <span class="pre">(shell</span> <span class="pre">wildcards)</span> <span class="pre">/</span> <span class="pre">matches</span> <span class="pre">the</span> <span class="pre">regular</span> <span class="pre">expression</span> <span class="pre">given.',</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'source</span> <span class="pre">system</span> <span class="pre">name':</span> <span class="pre">{'default':</span> <span class="pre">'',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'',</span> <span class="pre">'enumeration':</span> <span class="pre">(),</span> <span class="pre">'format_string':</span> <span class="pre">'s',</span> <span class="pre">'help_text':</span> <span class="pre">'The</span> <span class="pre">system</span> <span class="pre">name,</span> <span class="pre">wildcard</span> <span class="pre">pattern</span> <span class="pre">or</span> <span class="pre">regular</span> <span class="pre">expression.',</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'source</span> <span class="pre">systems':</span> <span class="pre">{'default':</span> <span class="pre">'current',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Systems:',</span> <span class="pre">'enumeration':</span> <span class="pre">('current',</span> <span class="pre">'all',</span> <span class="pre">'name</span> <span class="pre">is',</span> <span class="pre">'name</span> <span class="pre">matches',</span> <span class="pre">'name</span> <span class="pre">regexp'),</span> <span class="pre">'format_string':</span> <span class="pre">'s',</span> <span class="pre">'help_text':</span> <span class="pre">'Which</span> <span class="pre">systems</span> <span class="pre">to</span> <span class="pre">take</span> <span class="pre">the</span> <span class="pre">structures</span> <span class="pre">from:</span> <span class="pre">the</span> <span class="pre">current</span> <span class="pre">system,</span> <span class="pre">all</span> <span class="pre">systems,</span> <span class="pre">or</span> <span class="pre">those</span> <span class="pre">whose</span> <span class="pre">name</span> <span class="pre">is</span> <span class="pre">/</span> <span class="pre">matches</span> <span class="pre">(shell</span> <span class="pre">wildcards)</span> <span class="pre">/</span> <span class="pre">matches</span> <span class="pre">the</span> <span class="pre">regular</span> <span class="pre">expression</span> <span class="pre">given.</span> <span class="pre">A</span> <span class="pre">variable</span> <span class="pre">($name)</span> <span class="pre">holding</span> <span class="pre">a</span> <span class="pre">list</span> <span class="pre">of</span> <span class="pre">configurations</span> <span class="pre">or</span> <span class="pre">of</span> <span class="pre">systems</span> <span class="pre">may</span> <span class="pre">also</span> <span class="pre">be</span> <span class="pre">given.',</span> <span class="pre">'kind':</span> <span class="pre">'string'},</span> <span class="pre">'spread</span> <span class="pre">metric':</span> <span class="pre">{'default':</span> <span class="pre">'radius</span> <span class="pre">of</span> <span class="pre">gyration',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Spread</span> <span class="pre">metric:',</span> <span class="pre">'enumeration':</span> <span class="pre">('radius</span> <span class="pre">of</span> <span class="pre">gyration',</span> <span class="pre">'maximum</span> <span class="pre">centroid</span> <span class="pre">distance'),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">'The</span> <span class="pre">compactness</span> <span class="pre">coordinate</span> <span class="pre">of</span> <span class="pre">a</span> <span class="pre">cluster,</span> <span class="pre">computed</span> <span class="pre">from</span> <span class="pre">the</span> <span class="pre">molecular</span> <span class="pre">centroids:</span> <span class="pre">the</span> <span class="pre">radius</span> <span class="pre">of</span> <span class="pre">gyration,</span> <span class="pre">or</span> <span class="pre">the</span> <span class="pre">largest</span> <span class="pre">centroid-centroid</span> <span class="pre">distance.</span> <span class="pre">Used</span> <span class="pre">for</span> <span class="pre">stratification</span> <span class="pre">and</span> <span class="pre">stored</span> <span class="pre">on</span> <span class="pre">each</span> <span class="pre">cluster.',</span> <span class="pre">'kind':</span> <span class="pre">'enum'},</span> <span class="pre">'store</span> <span class="pre">properties':</span> <span class="pre">{'default':</span> <span class="pre">'yes',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Store</span> <span class="pre">descriptors</span> <span class="pre">as</span> <span class="pre">properties:',</span> <span class="pre">'enumeration':</span> <span class="pre">('yes',</span> <span class="pre">'no'),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;Store</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">size,</span> <span class="pre">spread,</span> <span class="pre">motif,</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">contacts</span> <span class="pre">and</span> <span class="pre">source</span> <span class="pre">molecules</span> <span class="pre">on</span> <span class="pre">each</span> <span class="pre">configuration</span> <span class="pre">as</span> <span class="pre">'#ExtractClusters#scan'</span> <span class="pre">properties.</span> <span class="pre">They</span> <span class="pre">are</span> <span class="pre">carried</span> <span class="pre">through</span> <span class="pre">SDF/extxyz</span> <span class="pre">output.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'boolean'},</span> <span class="pre">'stratification':</span> <span class="pre">{'default':</span> <span class="pre">'quantile</span> <span class="pre">bins',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Stratify</span> <span class="pre">by</span> <span class="pre">spread:',</span> <span class="pre">'enumeration':</span> <span class="pre">('none',</span> <span class="pre">'quantile</span> <span class="pre">bins',</span> <span class="pre">'explicit</span> <span class="pre">bin</span> <span class="pre">edges'),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;Whether</span> <span class="pre">to</span> <span class="pre">accept</span> <span class="pre">clusters</span> <span class="pre">so</span> <span class="pre">that</span> <span class="pre">the</span> <span class="pre">set</span> <span class="pre">is</span> <span class="pre">flat</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">spread</span> <span class="pre">metric.</span> <span class="pre">'quantile</span> <span class="pre">bins'</span> <span class="pre">places</span> <span class="pre">the</span> <span class="pre">bin</span> <span class="pre">edges</span> <span class="pre">at</span> <span class="pre">equal</span> <span class="pre">quantiles</span> <span class="pre">of</span> <span class="pre">a</span> <span class="pre">pilot</span> <span class="pre">sample</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">frame,</span> <span class="pre">so</span> <span class="pre">the</span> <span class="pre">bins</span> <span class="pre">adapt</span> <span class="pre">to</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">size</span> <span class="pre">and</span> <span class="pre">system;</span> <span class="pre">'explicit</span> <span class="pre">bin</span> <span class="pre">edges'</span> <span class="pre">uses</span> <span class="pre">the</span> <span class="pre">edges</span> <span class="pre">given</span> <span class="pre">below;</span> <span class="pre">'none'</span> <span class="pre">accepts</span> <span class="pre">clusters</span> <span class="pre">as</span> <span class="pre">sampled</span> <span class="pre">(biased</span> <span class="pre">towards</span> <span class="pre">the</span> <span class="pre">compact</span> <span class="pre">clusters</span> <span class="pre">that</span> <span class="pre">dominate</span> <span class="pre">the</span> <span class="pre">liquid).&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'enum'},</span> <span class="pre">'system</span> <span class="pre">name':</span> <span class="pre">{'default':</span> <span class="pre">'from</span> <span class="pre">source',</span> <span class="pre">'default_units':</span> <span class="pre">'',</span> <span class="pre">'description':</span> <span class="pre">'Name</span> <span class="pre">the</span> <span class="pre">cluster</span> <span class="pre">system:',</span> <span class="pre">'enumeration':</span> <span class="pre">('from</span> <span class="pre">source',),</span> <span class="pre">'format_string':</span> <span class="pre">'',</span> <span class="pre">'help_text':</span> <span class="pre">&quot;The</span> <span class="pre">name</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">system</span> <span class="pre">that</span> <span class="pre">receives</span> <span class="pre">the</span> <span class="pre">clusters,</span> <span class="pre">created</span> <span class="pre">if</span> <span class="pre">it</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">exist.</span> <span class="pre">'from</span> <span class="pre">source'</span> <span class="pre">uses</span> <span class="pre">'&lt;source</span> <span class="pre">system&gt;</span> <span class="pre">clusters',</span> <span class="pre">with</span> <span class="pre">the</span> <span class="pre">system</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">first</span> <span class="pre">selected</span> <span class="pre">structure.</span> <span class="pre">The</span> <span class="pre">clusters</span> <span class="pre">from</span> <span class="pre">all</span> <span class="pre">selected</span> <span class="pre">frames</span> <span class="pre">go</span> <span class="pre">into</span> <span class="pre">this</span> <span class="pre">one</span> <span class="pre">system.&quot;,</span> <span class="pre">'kind':</span> <span class="pre">'string'}}</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters.parameters" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-extract_clusters_step.extract_clusters_step">
+<span id="extract-clusters-step-extract-clusters-step-module"></span><h2>extract_clusters_step.extract_clusters_step module<a class="headerlink" href="#module-extract_clusters_step.extract_clusters_step" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_step.ExtractClustersStep">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">extract_clusters_step.extract_clusters_step.</span></span><span class="sig-name descname"><span class="pre">ExtractClustersStep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flowchart</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gui</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters_step.html#ExtractClustersStep"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Helper class needed for the stevedore integration.</p>
+<p>This must provide a description() method that returns a dict containing a
+description of this node, and create_node() and create_tk_node() methods
+for creating the graphical and non-graphical nodes.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_step.ExtractClustersStep.my_description">
+<span class="sig-name descname"><span class="pre">my_description</span></span><a class="headerlink" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.my_description" title="Link to this definition">¶</a></dt>
+<dd><p>A human-readable description of this step. It can be
+several lines long, and needs to be clear to non-expert users.
+It contains the following keys: description, group, name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>{description, group, name}</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">my_description</span></span><span class="sig-paren">[</span><span class="sig-paren">]</span><a class="headerlink" href="#id0" title="Link to this definition">¶</a></dt>
+<dd><p>A description of the Extract Clusters step. It must be
+clear to non-experts.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">my_description</span></span><span class="sig-paren">[</span><span class="sig-paren">]</span><a class="headerlink" href="#id1" title="Link to this definition">¶</a></dt>
+<dd><p>Which group in the menus to put this step. If the group does
+not exist it will be created. Common groups are “Building”,
+“Calculations”, “Control” and “Data”.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">my_description</span></span><span class="sig-paren">[</span><span class="sig-paren">]</span><a class="headerlink" href="#id2" title="Link to this definition">¶</a></dt>
+<dd><p>The name of this step, to be displayed in the menus.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_node">
+<span class="sig-name descname"><span class="pre">create_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flowchart</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters_step.html#ExtractClustersStep.create_node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_node" title="Link to this definition">¶</a></dt>
+<dd><p>Create and return the new node object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>flowchart</strong> (<em>seamm.Node</em>) – A non-graphical SEAMM node</p></li>
+<li><p><strong>**kwargs</strong> (<em>keyworded arguments</em>) – Various keyworded arguments such as title, namespace or
+extension representing the title displayed in the flowchart,
+the namespace for the plugins of a subflowchart and
+the extension, respectively.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters" title="extract_clusters_step.extract_clusters.ExtractClusters">ExtractClusters</a></p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtractClusters</span></code></p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_tk_node">
+<span class="sig-name descname"><span class="pre">create_tk_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">canvas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters_step.html#ExtractClustersStep.create_tk_node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_tk_node" title="Link to this definition">¶</a></dt>
+<dd><p>Create and return the graphical Tk node object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>canvas</strong> (<em>tk.Canvas</em>) – The Tk Canvas widget</p></li>
+<li><p><strong>**kwargs</strong> (<em>keyworded arguments</em>) – Various keyworded arguments such as tk_flowchart, node, x, y, w, h
+representing a graphical flowchart object, a non-graphical node for
+a step, and dimensions of the graphical node.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters" title="extract_clusters_step.tk_extract_clusters.TkExtractClusters">TkExtractClusters</a></p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters</span></code></p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.extract_clusters_step.ExtractClustersStep.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/extract_clusters_step.html#ExtractClustersStep.description"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.description" title="Link to this definition">¶</a></dt>
+<dd><p>Return a description of what this extension does.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">my_description</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'description':</span> <span class="pre">'Extract</span> <span class="pre">molecular</span> <span class="pre">clusters</span> <span class="pre">(trimers,</span> <span class="pre">tetramers,</span> <span class="pre">...</span> <span class="pre">larger</span> <span class="pre">n-mers)</span> <span class="pre">from</span> <span class="pre">a</span> <span class="pre">condensed-phase,</span> <span class="pre">typically</span> <span class="pre">periodic,</span> <span class="pre">configuration</span> <span class="pre">as</span> <span class="pre">unwrapped,</span> <span class="pre">non-periodic</span> <span class="pre">structures,</span> <span class="pre">e.g.</span> <span class="pre">for</span> <span class="pre">many-body</span> <span class="pre">training</span> <span class="pre">data</span> <span class="pre">and</span> <span class="pre">diagnostics</span> <span class="pre">for</span> <span class="pre">machine-learned</span> <span class="pre">force</span> <span class="pre">fields.',</span> <span class="pre">'group':</span> <span class="pre">'Building',</span> <span class="pre">'name':</span> <span class="pre">'Extract</span> <span class="pre">Clusters'}</span></span><a class="headerlink" href="#id3" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-extract_clusters_step.metadata">
+<span id="extract-clusters-step-metadata-module"></span><h2>extract_clusters_step.metadata module<a class="headerlink" href="#module-extract_clusters_step.metadata" title="Link to this heading">¶</a></h2>
+<p>This file contains metadata describing the results from Extract Clusters</p>
+</section>
+<section id="module-extract_clusters_step.tk_extract_clusters">
+<span id="extract-clusters-step-tk-extract-clusters-module"></span><h2>extract_clusters_step.tk_extract_clusters module<a class="headerlink" href="#module-extract_clusters_step.tk_extract_clusters" title="Link to this heading">¶</a></h2>
+<p>The graphical part of a Extract Clusters step</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">extract_clusters_step.tk_extract_clusters.</span></span><span class="sig-name descname"><span class="pre">TkExtractClusters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tk_flowchart</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">w</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">TkNode</span></code></p>
+<p>The graphical part of a Extract Clusters step in a flowchart.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.tk_flowchart">
+<span class="sig-name descname"><span class="pre">tk_flowchart</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.tk_flowchart" title="Link to this definition">¶</a></dt>
+<dd><p>The flowchart that we belong to.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>TkFlowchart = None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.node">
+<span class="sig-name descname"><span class="pre">node</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.node" title="Link to this definition">¶</a></dt>
+<dd><p>The corresponding node of the non-graphical flowchart</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Node = None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.canvas">
+<span class="sig-name descname"><span class="pre">canvas</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.canvas" title="Link to this definition">¶</a></dt>
+<dd><p>The Tk Canvas to draw on</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tkCanvas = None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.dialog">
+<span class="sig-name descname"><span class="pre">dialog</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.dialog" title="Link to this definition">¶</a></dt>
+<dd><p>The Pmw dialog object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dialog</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.x">
+<span class="sig-name descname"><span class="pre">x</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.x" title="Link to this definition">¶</a></dt>
+<dd><p>The x-coordinate of the center of the picture of the node</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int = None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.y">
+<span class="sig-name descname"><span class="pre">y</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.y" title="Link to this definition">¶</a></dt>
+<dd><p>The y-coordinate of the center of the picture of the node</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int = None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.w">
+<span class="sig-name descname"><span class="pre">w</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.w" title="Link to this definition">¶</a></dt>
+<dd><p>The width in pixels of the picture of the node</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int = 200</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.h">
+<span class="sig-name descname"><span class="pre">h</span></span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.h" title="Link to this definition">¶</a></dt>
+<dd><p>The height in pixels of the picture of the node</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int = 50</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.self">
+<span class="sig-name descname"><span class="pre">self</span></span><span class="sig-paren">[</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">]</span><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.self" title="Link to this definition">¶</a></dt>
+<dd><p>A dictionary of tk widgets built using the information
+contained in Extract Clusters_parameters.py</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtractClusters</span></code>, <a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters" title="extract_clusters_step.tk_extract_clusters.TkExtractClusters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters</span></code></a>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtractClustersParameters</span></code></p>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.create_dialog">
+<span class="sig-name descname"><span class="pre">create_dialog</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters.create_dialog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.create_dialog" title="Link to this definition">¶</a></dt>
+<dd><p>Create the dialog. A set of widgets will be chosen by default
+based on what is specified in the Extract Clusters_parameters
+module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.reset_dialog" title="extract_clusters_step.tk_extract_clusters.TkExtractClusters.reset_dialog"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters.reset_dialog</span></code></a></p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.edit">
+<span class="sig-name descname"><span class="pre">edit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters.edit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.edit" title="Link to this definition">¶</a></dt>
+<dd><p>Present a dialog for editing the Extract Clusters input</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.right_click" title="extract_clusters_step.tk_extract_clusters.TkExtractClusters.right_click"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters.right_click</span></code></a></p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_dialog">
+<span class="sig-name descname"><span class="pre">handle_dialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters.handle_dialog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_dialog" title="Link to this definition">¶</a></dt>
+<dd><p>Handle the closing of the edit dialog</p>
+<p>What to do depends on the button used to close the dialog. If
+the user closes it by clicking the “x” of the dialog window,
+None is returned, which we take as equivalent to cancel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>result</strong> (<em>None</em><em> or </em><em>str</em>) – The value of this variable depends on what the button
+the user clicked.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_help">
+<span class="sig-name descname"><span class="pre">handle_help</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters.handle_help"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_help" title="Link to this definition">¶</a></dt>
+<dd><p>Shows the help to the user when click on help button.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.reset_dialog">
+<span class="sig-name descname"><span class="pre">reset_dialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters.reset_dialog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.reset_dialog" title="Link to this definition">¶</a></dt>
+<dd><p>Layout the widgets in the dialog.</p>
+<p>Only the stratification controls that apply to the chosen scheme are
+shown: the number of bins for ‘quantile bins’, the edges for ‘explicit
+bin edges’, and neither when stratification is off, so an unusable
+combination cannot be built in the editor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>widget</strong> (<em>Tk Widget = None</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.create_dialog" title="extract_clusters_step.tk_extract_clusters.TkExtractClusters.create_dialog"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters.create_dialog</span></code></a></p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="extract_clusters_step.tk_extract_clusters.TkExtractClusters.right_click">
+<span class="sig-name descname"><span class="pre">right_click</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/extract_clusters_step/tk_extract_clusters.html#TkExtractClusters.right_click"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.right_click" title="Link to this definition">¶</a></dt>
+<dd><p>Handles the right click event on the node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>event</strong> (<em>Tk Event</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.edit" title="extract_clusters_step.tk_extract_clusters.TkExtractClusters.edit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TkExtractClusters.edit</span></code></a></p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-extract_clusters_step">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-extract_clusters_step" title="Link to this heading">¶</a></h2>
+<p>extract_clusters_step
+A SEAMM plug-in for extracting molecular clusters from a periodic cell of molecules</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">extract_clusters_step package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#module-extract_clusters_step.cluster_sampling">extract_clusters_step.cluster_sampling module</a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.accepts_topology"><code class="docutils literal notranslate"><span class="pre">accepts_topology()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.bond_index_pairs"><code class="docutils literal notranslate"><span class="pre">bond_index_pairs()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.check_bonds"><code class="docutils literal notranslate"><span class="pre">check_bonds()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.classify_motif"><code class="docutils literal notranslate"><span class="pre">classify_motif()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.cluster_motif"><code class="docutils literal notranslate"><span class="pre">cluster_motif()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.cluster_summary"><code class="docutils literal notranslate"><span class="pre">cluster_summary()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.extract_nmers"><code class="docutils literal notranslate"><span class="pre">extract_nmers()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.grow_connected"><code class="docutils literal notranslate"><span class="pre">grow_connected()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.make_put_property"><code class="docutils literal notranslate"><span class="pre">make_put_property()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.molecule_neighbour_graph"><code class="docutils literal notranslate"><span class="pre">molecule_neighbour_graph()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.motif_names"><code class="docutils literal notranslate"><span class="pre">motif_names()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.pilot_spreads"><code class="docutils literal notranslate"><span class="pre">pilot_spreads()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.cluster_sampling.unwrap_shifts"><code class="docutils literal notranslate"><span class="pre">unwrap_shifts()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-extract_clusters_step.extract_clusters">extract_clusters_step.extract_clusters module</a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters"><code class="docutils literal notranslate"><span class="pre">ExtractClusters</span></code></a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.parser"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.parser</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.options"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.options</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.parameters"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.parameters</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.analyze"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.analyze()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.description_text"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.description_text()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.git_revision"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.git_revision</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.property_tag"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.property_tag</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.run"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.run()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters.ExtractClusters.version"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.version</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-extract_clusters_step.extract_clusters_parameters">extract_clusters_step.extract_clusters_parameters module</a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters"><code class="docutils literal notranslate"><span class="pre">ExtractClustersParameters</span></code></a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters.parameters"><code class="docutils literal notranslate"><span class="pre">ExtractClustersParameters.parameters</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-extract_clusters_step.extract_clusters_step">extract_clusters_step.extract_clusters_step module</a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep</span></code></a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.my_description"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_node"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.create_node()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_tk_node"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.create_tk_node()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.extract_clusters_step.ExtractClustersStep.description"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.description()</span></code></a></li>
+<li><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-extract_clusters_step.metadata">extract_clusters_step.metadata module</a></li>
+<li><a class="reference internal" href="#module-extract_clusters_step.tk_extract_clusters">extract_clusters_step.tk_extract_clusters module</a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters</span></code></a><ul>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.tk_flowchart"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.tk_flowchart</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.node"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.node</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.canvas"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.canvas</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.dialog</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.x"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.x</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.y"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.y</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.w"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.w</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.h"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.h</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.self"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.self</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.create_dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.create_dialog()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.edit"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.edit()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.handle_dialog()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_help"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.handle_help()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.reset_dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.reset_dialog()</span></code></a></li>
+<li><a class="reference internal" href="#extract_clusters_step.tk_extract_clusters.TkExtractClusters.right_click"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.right_click()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-extract_clusters_step">Module contents</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="modules.html"
+                          title="previous chapter">extract_clusters_step</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="../installation.html"
+                          title="next chapter">Installation</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/developer/extract_clusters_step.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../installation.html" title="Installation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="modules.html" title="extract_clusters_step"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Developer Guide</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="modules.html" >extract_clusters_step</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step package</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

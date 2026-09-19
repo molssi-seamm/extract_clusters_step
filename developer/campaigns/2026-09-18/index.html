@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>2026-09-18: Reproducibility, motif selection, many frames &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="extract_clusters_step" href="../../modules.html" />
+    <link rel="prev" title="2026-09-17: Cluster (n-mer) extraction for MLFF data" href="../2026-09-17/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../../modules.html" title="extract_clusters_step"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../2026-09-17/index.html" title="2026-09-17: Cluster (n-mer) extraction for MLFF data"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Developer Guide</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">2026-09-18: Reproducibility, motif selection, many frames</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="reproducibility-motif-selection-many-frames">
+<h1>2026-09-18: Reproducibility, motif selection, many frames<a class="headerlink" href="#reproducibility-motif-selection-many-frames" title="Link to this heading">¶</a></h1>
+<p>Three enhancements requested after the first real use of the step on the
+3333-water NVT trajectory (Job 4800), planned together and delivered in two
+releases.</p>
+<section id="print-the-random-seed">
+<h2>1. Print the random seed<a class="headerlink" href="#print-the-random-seed" title="Link to this heading">¶</a></h2>
+<p>A run with the seed set to <code class="docutils literal notranslate"><span class="pre">random</span></code> could not be reproduced. The step now
+draws the seed from the operating system, builds the generator from it, prints
+it in the output and records it in <code class="docutils literal notranslate"><span class="pre">summary.json</span></code> together with the source
+system and configuration, the bin edges and the counts by motif. Entering the
+printed value as the seed reproduces the selection exactly (same source, same
+parameters). Delivered in 2026.9.18.</p>
+</section>
+<section id="restrict-the-topology">
+<h2>2. Restrict the topology<a class="headerlink" href="#restrict-the-topology" title="Link to this heading">¶</a></h2>
+<p>A new <em>Restrict to motifs</em> parameter accepts only clusters whose contact-graph
+motif is in the given list, e.g. <code class="docutils literal notranslate"><span class="pre">ring</span></code> or <code class="docutils literal notranslate"><span class="pre">ring,</span> <span class="pre">star</span></code>. The names come from
+<code class="docutils literal notranslate"><span class="pre">motif_names(n)</span></code> in <code class="docutils literal notranslate"><span class="pre">cluster_sampling</span></code>, so the dialog can offer exactly the
+motifs the requested sizes can produce; the run-time check validates typed or
+scripted values the same way. Rejection happens before the stratification
+quotas, uses the attempt budget, and is counted and reported, since rare motifs
+(rings are a few percent of water trimers) otherwise look like a sampling
+failure. A single motif hides <em>Balance motifs</em>, which would have nothing to
+balance over. Delivered in 2026.9.18.</p>
+</section>
+<section id="operate-on-many-configurations-in-one-step">
+<h2>3. Operate on many configurations in one step<a class="headerlink" href="#operate-on-many-configurations-in-one-step" title="Link to this heading">¶</a></h2>
+<p>The step is almost always used in a loop over trajectory frames, which is
+painful for the user and fragments the output into one directory and one file
+per iteration. The same selection problem has been solved three times already
+with three vocabularies: the Loop step (system-name filter plus “default
+configuration”), Write Structure (“current configuration / current system /
+all systems” plus a configuration filter) and the Dimer Builder
+(<code class="docutils literal notranslate"><span class="pre">_resolve_pool</span></code>: current, a system name, or a <code class="docutils literal notranslate"><span class="pre">$variable</span></code> plus
+all / last / first / name is / matches / regexp).</p>
+<p>Part A – a shared selection facility in <code class="docutils literal notranslate"><span class="pre">seamm.Node</span></code>, next to
+<code class="docutils literal notranslate"><span class="pre">get_system_configuration</span></code>, since every step inherits it and it owns the
+variables and the current system:</p>
+<ul class="simple">
+<li><p>a standard parameter block (which structures: current configuration, current
+system, a system, all systems, a variable; a system-name filter as in Loop; a
+configuration filter as in Loop and the Dimer Builder) that a step includes in
+its own parameters like the structure-handling block;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Node.select_configurations(P)</span></code> returning the ordered list, resolving
+<code class="docutils literal notranslate"><span class="pre">$variables</span></code> holding lists of configurations, with clear errors for an
+empty selection;</p></li>
+<li><p>a <code class="docutils literal notranslate"><span class="pre">TkNode</span></code> helper that lays the block out reactively so every dialog looks
+the same;</p></li>
+<li><p>then convert Loop (the reference semantics), Write Structure and the Dimer
+Builder one at a time, keeping flowchart parameter names backward compatible.</p></li>
+</ul>
+<p>Part A was delivered in seamm 2026.9.18.1 (<code class="docutils literal notranslate"><span class="pre">structure_selection_parameters</span></code>,
+<code class="docutils literal notranslate"><span class="pre">select_configurations</span></code>, <code class="docutils literal notranslate"><span class="pre">structure_selection_description</span></code>,
+<code class="docutils literal notranslate"><span class="pre">TkNode.create_structure_selection_widgets</span></code> / <code class="docutils literal notranslate"><span class="pre">layout_structure_selection</span></code>,
+developer-guide page “Selecting structures in a plug-in”). While reading the
+Loop step’s selection code two bugs were noted for its conversion: it compares
+configuration names with <code class="docutils literal notranslate"><span class="pre">is</span></code> rather than <code class="docutils literal notranslate"><span class="pre">==</span></code>, and it tests for
+<code class="docutils literal notranslate"><span class="pre">matches</span></code> / <code class="docutils literal notranslate"><span class="pre">regexp</span></code> while its enumeration offers <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">matches</span></code> /
+<code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">regexp</span></code>, so those choices fall through.</p>
+<p>Part B – Extract Clusters uses the block (delivered in 2026.9.18.1). Per selected configuration the
+extraction runs with the configuration name as the prefix, sharing one
+destination system and one random stream so the printed seed reproduces the
+whole set; the dedupe set stays per frame (the same molecule indices in
+different frames are different geometries); <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code> gains a <code class="docutils literal notranslate"><span class="pre">frame</span></code>
+column; the report gives one motif-by-bin table per size aggregated over frames
+plus a per-frame line.</p>
+<p>Verified on six frames of the Job 4800 trajectory read into one system: 60
+trimers and 60 tetramers in one step, 10 of each per frame, one SDF.</p>
+<p>Sequencing: Part A is a <code class="docutils literal notranslate"><span class="pre">seamm</span></code> release with tests against an in-memory
+database and a write-up of the selection semantics in the seamm developer
+docs; Part B follows as an Extract Clusters release once Part A is on PyPI;
+the conversions of Loop and Write Structure come after, each its own release.</p>
+<p>Open decisions: whether Part A lives in <code class="docutils literal notranslate"><span class="pre">seamm.Node</span></code> (preferred: it needs the
+variables and the current system) or a separate library; whether the motif
+restriction takes a list (yes – implemented in item 2).</p>
+</section>
+<section id="follow-up-2026-09-19-coordination-as-the-organising-variable">
+<h2>Follow-up 2026-09-19: coordination as the organising variable<a class="headerlink" href="#follow-up-2026-09-19-coordination-as-the-organising-variable" title="Link to this heading">¶</a></h2>
+<p>The labelled n-mer set (1684 clusters) showed the trimer MLFF over-binds
+three-coordinated centres (star tetramers) while chains are error-free
+(<code class="docutils literal notranslate"><span class="pre">~/Sites/mlff-training/2026-09-18_water-four-body-diagnostic/</span></code>), so the next
+training sets are organised by the coordination of the most-connected molecule:
+stars (n = 4, centre coordination 3), 4-stars (n = 5, coordination 4) and
+first-shell-plus (n = 6-7, coordination 4). For n &gt;= 5 the motif is only
+<code class="docutils literal notranslate"><span class="pre">e&lt;edges&gt;</span></code>, which cannot tell a 4-star from a 5-chain. Delivered:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">centre</span> <span class="pre">coordination</span></code> (the maximum degree of the induced contact graph) and
+<code class="docutils literal notranslate"><span class="pre">degrees</span></code> (the full sequence) stored as <code class="docutils literal notranslate"><span class="pre">#ExtractClusters#scan</span></code> properties
+and written to <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code> / <code class="docutils literal notranslate"><span class="pre">summary.json</span></code>.</p></li>
+<li><p>A <em>Centre coordination</em> parameter (a value or SEAMM list such as <code class="docutils literal notranslate"><span class="pre">3</span></code>, <code class="docutils literal notranslate"><span class="pre">4</span></code>
+or <code class="docutils literal notranslate"><span class="pre">3:4</span></code>) applied at acceptance, before the quotas, with the pilot sample
+honouring it so the bin edges describe the accepted population; rejections
+are counted and reported.</p></li>
+<li><p>The seed caveat: a supplementary run over the same frames needs a distinct
+seed (two jobs with <code class="docutils literal notranslate"><span class="pre">$_loop_index</span></code> seeds regenerated ~75 % identical
+clusters). Now in the parameter help and the user guide.</p></li>
+</ul>
+<p>Still open: a per-element-pair contact cutoff for mixed systems (EC/FEC + ions).</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">2026-09-18: Reproducibility, motif selection, many frames</a><ul>
+<li><a class="reference internal" href="#print-the-random-seed">1. Print the random seed</a></li>
+<li><a class="reference internal" href="#restrict-the-topology">2. Restrict the topology</a></li>
+<li><a class="reference internal" href="#operate-on-many-configurations-in-one-step">3. Operate on many configurations in one step</a></li>
+<li><a class="reference internal" href="#follow-up-2026-09-19-coordination-as-the-organising-variable">Follow-up 2026-09-19: coordination as the organising variable</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="../2026-09-17/index.html"
+                          title="previous chapter">2026-09-17: Cluster (n-mer) extraction for MLFF data</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="../../modules.html"
+                          title="next chapter">extract_clusters_step</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/developer/campaigns/2026-09-18/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../../modules.html" title="extract_clusters_step"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../2026-09-17/index.html" title="2026-09-17: Cluster (n-mer) extraction for MLFF data"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Developer Guide</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">2026-09-18: Reproducibility, motif selection, many frames</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>extract_clusters_step &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="extract_clusters_step package" href="extract_clusters_step.html" />
+    <link rel="prev" title="2026-09-18: Reproducibility, motif selection, many frames" href="campaigns/2026-09-18/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="extract_clusters_step.html" title="extract_clusters_step package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="campaigns/2026-09-18/index.html" title="2026-09-18: Reproducibility, motif selection, many frames"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">Developer Guide</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="extract-clusters-step">
+<h1>extract_clusters_step<a class="headerlink" href="#extract-clusters-step" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="extract_clusters_step.html">extract_clusters_step package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step.cluster_sampling">extract_clusters_step.cluster_sampling module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.accepts_topology"><code class="docutils literal notranslate"><span class="pre">accepts_topology()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.bond_index_pairs"><code class="docutils literal notranslate"><span class="pre">bond_index_pairs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.check_bonds"><code class="docutils literal notranslate"><span class="pre">check_bonds()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.classify_motif"><code class="docutils literal notranslate"><span class="pre">classify_motif()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.cluster_motif"><code class="docutils literal notranslate"><span class="pre">cluster_motif()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.cluster_summary"><code class="docutils literal notranslate"><span class="pre">cluster_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.extract_nmers"><code class="docutils literal notranslate"><span class="pre">extract_nmers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.grow_connected"><code class="docutils literal notranslate"><span class="pre">grow_connected()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.make_put_property"><code class="docutils literal notranslate"><span class="pre">make_put_property()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.molecule_neighbour_graph"><code class="docutils literal notranslate"><span class="pre">molecule_neighbour_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.motif_names"><code class="docutils literal notranslate"><span class="pre">motif_names()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.pilot_spreads"><code class="docutils literal notranslate"><span class="pre">pilot_spreads()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.cluster_sampling.unwrap_shifts"><code class="docutils literal notranslate"><span class="pre">unwrap_shifts()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step.extract_clusters">extract_clusters_step.extract_clusters module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters"><code class="docutils literal notranslate"><span class="pre">ExtractClusters</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.parser"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.parser</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.options"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.parameters"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.parameters</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.analyze"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.analyze()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.description_text"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.description_text()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.git_revision"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.git_revision</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.property_tag"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.property_tag</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.run"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters.ExtractClusters.version"><code class="docutils literal notranslate"><span class="pre">ExtractClusters.version</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step.extract_clusters_parameters">extract_clusters_step.extract_clusters_parameters module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters"><code class="docutils literal notranslate"><span class="pre">ExtractClustersParameters</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_parameters.ExtractClustersParameters.parameters"><code class="docutils literal notranslate"><span class="pre">ExtractClustersParameters.parameters</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step.extract_clusters_step">extract_clusters_step.extract_clusters_step module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.my_description"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#id0"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#id1"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#id2"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_node"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.create_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_tk_node"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.create_tk_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.description"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#id3"><code class="docutils literal notranslate"><span class="pre">ExtractClustersStep.my_description</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step.metadata">extract_clusters_step.metadata module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step.tk_extract_clusters">extract_clusters_step.tk_extract_clusters module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.tk_flowchart"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.tk_flowchart</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.node"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.node</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.canvas"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.canvas</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.dialog</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.x"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.x</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.y"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.y</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.w"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.w</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.h"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.h</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.self"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.self</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.create_dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.create_dialog()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.edit"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.edit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.handle_dialog()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.handle_help"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.handle_help()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.reset_dialog"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.reset_dialog()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extract_clusters_step.html#extract_clusters_step.tk_extract_clusters.TkExtractClusters.right_click"><code class="docutils literal notranslate"><span class="pre">TkExtractClusters.right_click()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extract_clusters_step.html#module-extract_clusters_step">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="campaigns/2026-09-18/index.html"
+                          title="previous chapter">2026-09-18: Reproducibility, motif selection, many frames</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="extract_clusters_step.html"
+                          title="next chapter">extract_clusters_step package</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/developer/modules.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="extract_clusters_step.html" title="extract_clusters_step package"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="campaigns/2026-09-18/index.html" title="2026-09-18: Reproducibility, motif selection, many frames"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Developer Guide</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

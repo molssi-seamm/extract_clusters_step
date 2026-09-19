@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>extract_clusters_step.cluster_sampling &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step.cluster_sampling</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for extract_clusters_step.cluster_sampling</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="sd">"""Sampling of n-molecule clusters from a (periodic) configuration.</span>
+
+<span class="sd">The pure functions here have no dependence on the SEAMM framework, only on</span>
+<span class="sd">numpy/scipy and the duck-typed ``molsystem`` configuration passed in, so they</span>
+<span class="sd">can be unit-tested directly and reused outside a flowchart.</span>
+
+<span class="sd">The approach:</span>
+
+<span class="sd">1. Find the molecules (by bonds) and build a molecular **contact graph**:</span>
+<span class="sd">   molecule A is adjacent to B if any *contact atom* of A is within ``cutoff``</span>
+<span class="sd">   (minimum image) of any contact atom of B.</span>
+<span class="sd">2. Sample n-mers as **connected subgraphs** of that graph by random frontier</span>
+<span class="sd">   growth from a random seed molecule. Every member interacts with at least one</span>
+<span class="sd">   other, and chains, rings and stars all occur -- unlike nearest-neighbour</span>
+<span class="sd">   selection, which only ever yields the most compact cluster.</span>
+<span class="sd">3. Optionally **stratify** the accepted clusters to be flat in a spread</span>
+<span class="sd">   coordinate (radius of gyration or largest centroid separation of the</span>
+<span class="sd">   molecules), with bin edges taken as quantiles of a pilot sample, and</span>
+<span class="sd">   optionally balance jointly over contact-graph topology (motif).</span>
+<span class="sd">4. Emit each cluster as an **unwrapped, centred, non-periodic** configuration</span>
+<span class="sd">   with the molecules intact, a unique name carrying provenance, and optional</span>
+<span class="sd">   per-configuration properties.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">PROPERTY_TAG</span> <span class="o">=</span> <span class="s2">"#ExtractClusters#scan"</span>
+
+<span class="n">SPREAD_METRICS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"rg"</span><span class="p">,</span> <span class="s2">"dmax"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="classify_motif">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.classify_motif">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">classify_motif</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="n">degrees</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Name the topology of the induced contact graph of an n-mer.</span>
+
+<span class="sd">    Only n &lt;= 4 get descriptive names; larger clusters are labelled by edge</span>
+<span class="sd">    count so they can still be balanced on topology.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n : int</span>
+<span class="sd">        Number of molecules.</span>
+<span class="sd">    n_edges : int</span>
+<span class="sd">        Number of contact edges within the cluster.</span>
+<span class="sd">    degrees : [int]</span>
+<span class="sd">        The degree of each molecule within the cluster.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">    """</span>
+    <span class="n">maxdeg</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">degrees</span><span class="p">)</span> <span class="k">if</span> <span class="n">degrees</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"dimer"</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span> <span class="s2">"chain"</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="s2">"ring"</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">n_edges</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"e</span><span class="si">{</span><span class="n">n_edges</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">n_edges</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">"star"</span> <span class="k">if</span> <span class="n">maxdeg</span> <span class="o">==</span> <span class="mi">3</span> <span class="k">else</span> <span class="s2">"chain"</span>
+        <span class="k">if</span> <span class="n">n_edges</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">"ring"</span> <span class="k">if</span> <span class="n">maxdeg</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">"paw"</span>  <span class="c1"># triangle + tail</span>
+        <span class="k">if</span> <span class="n">n_edges</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">"diamond"</span>
+        <span class="k">if</span> <span class="n">n_edges</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">"K4"</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"e</span><span class="si">{</span><span class="n">n_edges</span><span class="si">}</span><span class="s2">"</span></div>
+
+
+
+<div class="viewcode-block" id="motif_names">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.motif_names">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">motif_names</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The motif labels :func:`classify_motif` can produce for n molecules.</span>
+
+<span class="sd">    Named motifs for n &lt;= 4; for larger n the labels are ``e&lt;edges&gt;`` for every</span>
+<span class="sd">    possible edge count of a connected graph, from n-1 (a tree) to n(n-1)/2.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s2">"dimer"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"ring"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"star"</span><span class="p">,</span> <span class="s2">"ring"</span><span class="p">,</span> <span class="s2">"paw"</span><span class="p">,</span> <span class="s2">"diamond"</span><span class="p">,</span> <span class="s2">"K4"</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"e</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="molecule_neighbour_graph">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.molecule_neighbour_graph">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">molecule_neighbour_graph</span><span class="p">(</span>
+    <span class="n">frac_atoms</span><span class="p">,</span> <span class="n">atom_mol</span><span class="p">,</span> <span class="n">contact_mask</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">periodic</span><span class="p">,</span> <span class="n">cell_parameters</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Molecule-level adjacency from atom contacts.</span>
+
+<span class="sd">    A~B if any contact atom of A is within ``cutoff`` (Å, minimum image) of any</span>
+<span class="sd">    contact atom of B.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    frac_atoms : (N,3) ndarray</span>
+<span class="sd">        Fractional coordinates (Cartesian if not periodic).</span>
+<span class="sd">    atom_mol : (N,) ndarray of int</span>
+<span class="sd">        Molecule index of each atom.</span>
+<span class="sd">    contact_mask : (N,) ndarray of bool</span>
+<span class="sd">        Which atoms define contact.</span>
+<span class="sd">    T : (3,3) ndarray</span>
+<span class="sd">        Fractional-&gt;Cartesian transform (``xyz = uvw @ T``); identity if not</span>
+<span class="sd">        periodic.</span>
+<span class="sd">    cutoff : float</span>
+<span class="sd">        Contact distance, Å.</span>
+<span class="sd">    periodic : bool</span>
+<span class="sd">    cell_parameters : (a, b, c, alpha, beta, gamma) or None</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict[int, set[int]]</span>
+<span class="sd">        Adjacency lists keyed by molecule index. Molecules with no contacts</span>
+<span class="sd">        are absent.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial</span><span class="w"> </span><span class="kn">import</span> <span class="n">cKDTree</span>
+
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">contact_mask</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">mol_of</span> <span class="o">=</span> <span class="n">atom_mol</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">periodic</span><span class="p">:</span>
+        <span class="n">xyz</span> <span class="o">=</span> <span class="n">frac_atoms</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">pairs</span> <span class="o">=</span> <span class="n">cKDTree</span><span class="p">(</span><span class="n">xyz</span><span class="p">)</span><span class="o">.</span><span class="n">query_pairs</span><span class="p">(</span><span class="n">cutoff</span><span class="p">,</span> <span class="n">output_type</span><span class="o">=</span><span class="s2">"ndarray"</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">gamma</span> <span class="o">=</span> <span class="n">cell_parameters</span>
+        <span class="n">orthorhombic</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="mf">90.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-6</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">orthorhombic</span><span class="p">:</span>
+            <span class="c1"># Fast path: periodic KD-tree on wrapped Cartesian coordinates.</span>
+            <span class="n">L</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">])</span>
+            <span class="n">xyz</span> <span class="o">=</span> <span class="p">(</span><span class="n">frac_atoms</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">%</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">L</span>
+            <span class="n">xyz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">xyz</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nextafter</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>  <span class="c1"># guard x == L</span>
+            <span class="n">pairs</span> <span class="o">=</span> <span class="n">cKDTree</span><span class="p">(</span><span class="n">xyz</span><span class="p">,</span> <span class="n">boxsize</span><span class="o">=</span><span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">query_pairs</span><span class="p">(</span><span class="n">cutoff</span><span class="p">,</span> <span class="n">output_type</span><span class="o">=</span><span class="s2">"ndarray"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># General cell: exact minimum-image on fractional differences,</span>
+            <span class="c1"># chunked so memory stays bounded. O(M^2) in contact atoms.</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">frac_atoms</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">M</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">chunk</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="mf">2e7</span> <span class="o">//</span> <span class="nb">max</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">chunk</span><span class="p">):</span>
+                <span class="n">d</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="n">s</span> <span class="p">:</span> <span class="n">s</span> <span class="o">+</span> <span class="n">chunk</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">f</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="n">d</span> <span class="o">-=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">d</span> <span class="o">@</span> <span class="n">T</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+                <span class="n">ii</span><span class="p">,</span> <span class="n">jj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">r</span> <span class="o">&lt;</span> <span class="n">cutoff</span><span class="p">)</span>
+                <span class="n">ii</span> <span class="o">+=</span> <span class="n">s</span>
+                <span class="n">keep</span> <span class="o">=</span> <span class="n">ii</span> <span class="o">&lt;</span> <span class="n">jj</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">ii</span><span class="p">[</span><span class="n">keep</span><span class="p">],</span> <span class="n">jj</span><span class="p">[</span><span class="n">keep</span><span class="p">]],</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">pairs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">out</span><span class="p">)</span> <span class="k">if</span> <span class="n">out</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">int</span><span class="p">)</span>
+
+    <span class="n">adj</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">):</span>
+        <span class="n">mi</span><span class="p">,</span> <span class="n">mj</span> <span class="o">=</span> <span class="n">mol_of</span><span class="p">[</span><span class="n">pairs</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]],</span> <span class="n">mol_of</span><span class="p">[</span><span class="n">pairs</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]]</span>
+        <span class="n">keep</span> <span class="o">=</span> <span class="n">mi</span> <span class="o">!=</span> <span class="n">mj</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">mi</span><span class="p">[</span><span class="n">keep</span><span class="p">],</span> <span class="n">mj</span><span class="p">[</span><span class="n">keep</span><span class="p">]):</span>
+            <span class="n">adj</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="nb">set</span><span class="p">())</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">j</span><span class="p">))</span>
+            <span class="n">adj</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">j</span><span class="p">),</span> <span class="nb">set</span><span class="p">())</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">adj</span></div>
+
+
+
+<div class="viewcode-block" id="grow_connected">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.grow_connected">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">grow_connected</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">rng</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Grow a connected n-molecule subgraph from ``seed``.</span>
+
+<span class="sd">    Random frontier expansion: at each step a molecule adjacent to the current</span>
+<span class="sd">    cluster is chosen uniformly and attached through a random one of its</span>
+<span class="sd">    neighbours already inside. Uniform choice from the frontier is a cheap</span>
+<span class="sd">    approximation to uniform connected-subgraph sampling; it mildly favours</span>
+<span class="sd">    high-degree regions.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    (order, parent) or None</span>
+<span class="sd">        ``order`` is the list of molecule indices in growth order; ``parent``</span>
+<span class="sd">        maps each to the molecule it attached through (None for the seed).</span>
+<span class="sd">        None if the connected component is smaller than n.</span>
+<span class="sd">    """</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="p">[</span><span class="n">seed</span><span class="p">]</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="p">{</span><span class="n">seed</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+    <span class="n">inside</span> <span class="o">=</span> <span class="p">{</span><span class="n">seed</span><span class="p">}</span>
+    <span class="n">frontier</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">adj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="p">()))</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">order</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">frontier</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">cands</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cands</span><span class="p">[</span><span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cands</span><span class="p">))])</span>
+        <span class="n">anchors</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">adj</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">inside</span><span class="p">)</span>
+        <span class="n">parent</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">anchors</span><span class="p">[</span><span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">anchors</span><span class="p">))])</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+        <span class="n">inside</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+        <span class="n">frontier</span> <span class="o">|=</span> <span class="n">adj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">set</span><span class="p">())</span>
+        <span class="n">frontier</span> <span class="o">-=</span> <span class="n">inside</span>
+    <span class="k">return</span> <span class="n">order</span><span class="p">,</span> <span class="n">parent</span></div>
+
+
+
+<div class="viewcode-block" id="unwrap_shifts">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.unwrap_shifts">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unwrap_shifts</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">frac_centroids</span><span class="p">,</span> <span class="n">periodic</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Integer lattice shifts making each molecule contiguous with its parent.</span>
+
+<span class="sd">    Each molecule is shifted to the image nearest the neighbour it attached</span>
+<span class="sd">    through, so the whole cluster is contiguous in space.</span>
+<span class="sd">    """</span>
+    <span class="n">shifts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">order</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parent</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">periodic</span><span class="p">:</span>
+            <span class="n">shifts</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">parent</span><span class="p">[</span><span class="n">m</span><span class="p">]</span>
+            <span class="n">u_p</span> <span class="o">=</span> <span class="n">frac_centroids</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="o">+</span> <span class="n">shifts</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+            <span class="n">shifts</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">u_p</span> <span class="o">-</span> <span class="n">frac_centroids</span><span class="p">[</span><span class="n">m</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">shifts</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_spreads</span><span class="p">(</span><span class="n">cen</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Radius of gyration and largest pairwise distance of a set of points."""</span>
+    <span class="n">cen0</span> <span class="o">=</span> <span class="n">cen</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">rg</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(((</span><span class="n">cen</span> <span class="o">-</span> <span class="n">cen0</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()))</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cen</span><span class="p">)</span>
+    <span class="n">dmax</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+        <span class="nb">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">cen</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">cen</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">rg</span><span class="p">,</span> <span class="n">dmax</span>
+
+
+<div class="viewcode-block" id="cluster_motif">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.cluster_motif">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cluster_motif</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The motif label, edge count and degree list of the cluster ``order``."""</span>
+    <span class="n">inside</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">order</span><span class="p">)</span>
+    <span class="n">sub_edges</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">order</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">adj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">())</span> <span class="k">if</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">inside</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">j</span><span class="p">]</span>
+    <span class="n">deg</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">sub_edges</span><span class="p">:</span>
+        <span class="n">deg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">deg</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">degrees</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">((</span><span class="n">deg</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">order</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">classify_motif</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">order</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_edges</span><span class="p">),</span> <span class="n">degrees</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_edges</span><span class="p">),</span> <span class="n">degrees</span></div>
+
+
+
+<div class="viewcode-block" id="accepts_topology">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.accepts_topology">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">accepts_topology</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">motifs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordination</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Whether the cluster ``order`` passes the motif and centre-coordination</span>
+<span class="sd">    filters. Returns (accepted, motif, n_edges, degrees)."""</span>
+    <span class="n">motif</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="n">degrees</span> <span class="o">=</span> <span class="n">cluster_motif</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">motifs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">motif</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">motif</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="n">degrees</span>
+    <span class="k">if</span> <span class="n">coordination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">degrees</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">coordination</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">motif</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="n">degrees</span>
+    <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="n">motif</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="n">degrees</span></div>
+
+
+
+<div class="viewcode-block" id="pilot_spreads">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.pilot_spreads">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pilot_spreads</span><span class="p">(</span>
+    <span class="n">adj</span><span class="p">,</span>
+    <span class="n">n</span><span class="p">,</span>
+    <span class="n">frac_centroids</span><span class="p">,</span>
+    <span class="n">T</span><span class="p">,</span>
+    <span class="n">periodic</span><span class="p">,</span>
+    <span class="n">spread_metric</span><span class="p">,</span>
+    <span class="n">n_mol</span><span class="p">,</span>
+    <span class="n">rng</span><span class="p">,</span>
+    <span class="n">n_pilot</span><span class="p">,</span>
+    <span class="n">motifs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">coordination</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Spread values of an unstratified pilot sample, used to place bin edges.</span>
+
+<span class="sd">    If ``motifs`` or ``coordination`` is given only clusters passing those</span>
+<span class="sd">    filters are sampled, so the bin edges describe the distribution the</span>
+<span class="sd">    extraction will actually draw from (ring trimers, say, are compact and never</span>
+<span class="sd">    reach the widest all-motif bin).</span>
+<span class="sd">    """</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">tries</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># A topology restriction can reject most candidates, so allow more tries.</span>
+    <span class="n">restricted</span> <span class="o">=</span> <span class="n">motifs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">coordination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="n">max_tries</span> <span class="o">=</span> <span class="p">(</span><span class="mi">200</span> <span class="k">if</span> <span class="n">restricted</span> <span class="k">else</span> <span class="mi">20</span><span class="p">)</span> <span class="o">*</span> <span class="n">n_pilot</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">n_pilot</span> <span class="ow">and</span> <span class="n">tries</span> <span class="o">&lt;</span> <span class="n">max_tries</span><span class="p">:</span>
+        <span class="n">tries</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">g</span> <span class="o">=</span> <span class="n">grow_connected</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="n">n_mol</span><span class="p">)),</span> <span class="n">n</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">g</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">order</span><span class="p">,</span> <span class="n">parent</span> <span class="o">=</span> <span class="n">g</span>
+        <span class="k">if</span> <span class="n">restricted</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">accepts_topology</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">motifs</span><span class="p">,</span> <span class="n">coordination</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">continue</span>
+        <span class="n">shifts</span> <span class="o">=</span> <span class="n">unwrap_shifts</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">frac_centroids</span><span class="p">,</span> <span class="n">periodic</span><span class="p">)</span>
+        <span class="n">cen</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">frac_centroids</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">+</span> <span class="n">shifts</span><span class="p">[</span><span class="n">m</span><span class="p">])</span> <span class="o">@</span> <span class="n">T</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">order</span><span class="p">])</span>
+        <span class="n">rg</span><span class="p">,</span> <span class="n">dmax</span> <span class="o">=</span> <span class="n">_spreads</span><span class="p">(</span><span class="n">cen</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rg</span> <span class="k">if</span> <span class="n">spread_metric</span> <span class="o">==</span> <span class="s2">"rg"</span> <span class="k">else</span> <span class="n">dmax</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Elements that are legitimately single-atom "molecules" without bonds -- noble</span>
+<span class="c1"># gases and the common monatomic ions -- so a bond-less configuration made only of</span>
+<span class="c1"># these is fine (a rare-gas liquid, a molten salt).</span>
+<span class="n">BONDLESS_OK</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="s2">"He Ne Ar Kr Xe Rn Li Na K Rb Cs Fr Be Mg Ca Sr Ba Ra F Cl Br I"</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="check_bonds">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.check_bonds">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_bonds</span><span class="p">(</span><span class="n">configuration</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Raise if the configuration has no bonds but clearly consists of molecules.</span>
+
+<span class="sd">    Molecules are found from the bonds, so a configuration read from a format</span>
+<span class="sd">    without connectivity (e.g. extended XYZ without bond perception) would be</span>
+<span class="sd">    treated as one atom per molecule and the "clusters" would silently be</span>
+<span class="sd">    groups of atoms. Configurations made only of noble-gas atoms or monatomic</span>
+<span class="sd">    ions are allowed through.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">n_atoms</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">configuration</span><span class="o">.</span><span class="n">bonds</span><span class="o">.</span><span class="n">n_bonds</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">offending</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">atoms</span><span class="o">.</span><span class="n">symbols</span><span class="p">)</span> <span class="o">-</span> <span class="n">BONDLESS_OK</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">offending</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"The configuration has no bonds, so its molecules cannot be identified "</span>
+            <span class="sa">f</span><span class="s2">"(it contains </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">offending</span><span class="p">)</span><span class="si">}</span><span class="s2">, which form molecules). Structures "</span>
+            <span class="s2">"from formats without connectivity, such as extended XYZ, need their "</span>
+            <span class="s2">"bonds perceived first: turn on 'Perceive bonds' in the Read Structure "</span>
+            <span class="s2">"step, or call configuration.perceive_bonds()."</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="bond_index_pairs">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.bond_index_pairs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">bond_index_pairs</span><span class="p">(</span><span class="n">configuration</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The bonds of a configuration as 0-based atom-index pairs, with orders.</span>
+
+<span class="sd">    For a configuration without symmetry operators (the normal case, and every</span>
+<span class="sd">    non-periodic one) the pairs come straight from the bond table, since</span>
+<span class="sd">    ``symmetry.bond_atoms`` is only populated for periodic configurations. For</span>
+<span class="sd">    a symmetric crystal the symmetry-expanded list is used.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    (pairs, orders)</span>
+<span class="sd">        ``pairs`` is a list of (i, j) index tuples; ``orders`` the matching</span>
+<span class="sd">        list of bond orders, or None if it could not be matched up.</span>
+<span class="sd">    """</span>
+    <span class="n">atoms</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">atoms</span>
+    <span class="n">bonds</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">bonds</span>
+    <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">symmetry</span><span class="o">.</span><span class="n">n_symops</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="p">{</span><span class="n">aid</span><span class="p">:</span> <span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">aid</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">atoms</span><span class="o">.</span><span class="n">ids</span><span class="p">)}</span>
+        <span class="n">Is</span> <span class="o">=</span> <span class="n">bonds</span><span class="o">.</span><span class="n">get_column_data</span><span class="p">(</span><span class="s2">"i"</span><span class="p">)</span>
+        <span class="n">Js</span> <span class="o">=</span> <span class="n">bonds</span><span class="o">.</span><span class="n">get_column_data</span><span class="p">(</span><span class="s2">"j"</span><span class="p">)</span>
+        <span class="n">pairs</span> <span class="o">=</span> <span class="p">[(</span><span class="n">index</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">index</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">Is</span><span class="p">,</span> <span class="n">Js</span><span class="p">)]</span>
+        <span class="n">orders</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">bonds</span><span class="o">.</span><span class="n">get_column_data</span><span class="p">(</span><span class="s2">"bondorder"</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">pairs</span> <span class="o">=</span> <span class="p">[(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">j</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">configuration</span><span class="o">.</span><span class="n">symmetry</span><span class="o">.</span><span class="n">bond_atoms</span><span class="p">]</span>
+        <span class="n">orders</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">bonds</span><span class="o">.</span><span class="n">bondorders</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">orders</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">):</span>
+        <span class="n">orders</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">pairs</span><span class="p">,</span> <span class="n">orders</span></div>
+
+
+
+<div class="viewcode-block" id="make_put_property">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.make_put_property">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_put_property</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="n">PROPERTY_TAG</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a closure storing ``name+tag`` properties on ``conf``.</span>
+
+<span class="sd">    Defines the property first if the database lacks it (the properties are</span>
+<span class="sd">    normally pre-registered from ``data/properties.csv``).</span>
+<span class="sd">    """</span>
+    <span class="n">props</span> <span class="o">=</span> <span class="n">conf</span><span class="o">.</span><span class="n">properties</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_put</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">_type</span><span class="o">=</span><span class="s2">"float"</span><span class="p">):</span>
+        <span class="n">full</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}{</span><span class="n">tag</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">props</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">full</span><span class="p">):</span>
+            <span class="n">props</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">full</span><span class="p">,</span> <span class="n">_type</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="n">units</span><span class="p">,</span> <span class="n">noerror</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">props</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">full</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_put</span></div>
+
+
+
+<div class="viewcode-block" id="extract_nmers">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.extract_nmers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_nmers</span><span class="p">(</span>
+    <span class="n">configuration</span><span class="p">,</span>
+    <span class="n">n</span><span class="p">,</span>
+    <span class="n">n_samples</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mf">3.5</span><span class="p">,</span>
+    <span class="n">contact_elements</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">spread_metric</span><span class="o">=</span><span class="s2">"rg"</span><span class="p">,</span>
+    <span class="n">spread_bins</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">balance_motifs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">motifs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">coordination</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">system</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">system_name</span><span class="o">=</span><span class="s2">"clusters"</span><span class="p">,</span>
+    <span class="n">name_prefix</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span>
+    <span class="n">max_attempts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">rng</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">store_properties</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">seen</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Extract n-molecule clusters from a (periodic) configuration.</span>
+
+<span class="sd">    The clusters are returned as unwrapped, non-periodic configurations</span>
+<span class="sd">    suitable for cluster QM.</span>
+
+<span class="sd">    Selection is by *connected subgraph* of a molecular contact graph, not by</span>
+<span class="sd">    nearest neighbours: every molecule in a returned n-mer is within</span>
+<span class="sd">    ``cutoff`` of at least one other, but chains, rings and stars all occur,</span>
+<span class="sd">    and seeds are random so a single frame yields many distinct clusters.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    configuration : molsystem _Configuration</span>
+<span class="sd">        Source configuration (periodic or not). Molecules are found by bonds.</span>
+<span class="sd">    n : int</span>
+<span class="sd">        Molecules per cluster (&gt;= 2).</span>
+<span class="sd">    n_samples : int</span>
+<span class="sd">        Target number of clusters (fewer if the pool or quotas run out).</span>
+<span class="sd">    cutoff : float</span>
+<span class="sd">        Contact distance (Å) defining the neighbour graph. 3.5 with</span>
+<span class="sd">        ``contact_elements=["O"]`` is the usual H-bond criterion for water.</span>
+<span class="sd">    contact_elements : list[str] or None</span>
+<span class="sd">        Elements whose atoms define contact; None uses all atoms.</span>
+<span class="sd">    spread_metric : "rg" | "dmax"</span>
+<span class="sd">        Compactness coordinate used for stratification: radius of gyration of</span>
+<span class="sd">        the molecular centroids, or the largest centroid-centroid distance.</span>
+<span class="sd">    spread_bins : int, sequence of float, or None</span>
+<span class="sd">        Bin edges on the spread coordinate. An int asks for that many</span>
+<span class="sd">        equal-quantile bins, with edges taken from an unstratified pilot</span>
+<span class="sd">        sample of the same frame -- the usual choice, since sensible edges</span>
+<span class="sd">        depend on n and on the system. If given, acceptance is quota-</span>
+<span class="sd">        limited so bins fill roughly evenly (flat-in-spread, analogous to the</span>
+<span class="sd">        dimer builder's flat-in-energy selection). Samples outside the edges</span>
+<span class="sd">        are rejected. None disables stratification.</span>
+<span class="sd">    balance_motifs : bool</span>
+<span class="sd">        Also balance across contact-graph topology (chain/ring/star/...),</span>
+<span class="sd">        jointly with the spread bins.</span>
+<span class="sd">    motifs : iterable of str or None</span>
+<span class="sd">        Accept only clusters whose contact-graph motif is one of these (see</span>
+<span class="sd">        :func:`motif_names`); None accepts every motif. Rejected candidates</span>
+<span class="sd">        count against the attempt budget, so rare motifs (rings are a few</span>
+<span class="sd">        percent of water trimers) may need a larger budget.</span>
+<span class="sd">    coordination : iterable of int or None</span>
+<span class="sd">        Accept only clusters whose most-connected molecule has one of these</span>
+<span class="sd">        numbers of contacts within the cluster (its degree in the induced</span>
+<span class="sd">        contact graph) -- e.g. ``[3]`` for star tetramers, ``[4]`` for a</span>
+<span class="sd">        complete first shell. None accepts any. Stored on every cluster as the</span>
+<span class="sd">        ``centre coordination`` property.</span>
+<span class="sd">    system : molsystem _System or None</span>
+<span class="sd">        Destination system. If None, ``system_name`` is looked up in the</span>
+<span class="sd">        configuration's database and created if needed.</span>
+<span class="sd">    system_name : str</span>
+<span class="sd">        Destination system name, used when ``system`` is None.</span>
+<span class="sd">    name_prefix : str</span>
+<span class="sd">        Prefix (e.g. a frame label) for the configuration names, which are</span>
+<span class="sd">        ``f"{name_prefix}{seed}_{m1-m2-...}"`` and unique within a frame.</span>
+<span class="sd">    max_attempts : int or None</span>
+<span class="sd">        Sampling attempts before giving up (default 50 * n_samples).</span>
+<span class="sd">    rng : int, numpy Generator or None</span>
+<span class="sd">        Seed / generator for reproducibility.</span>
+<span class="sd">    store_properties : bool</span>
+<span class="sd">        Store size, spread, motif, edge count, and source molecule list as</span>
+<span class="sd">        ``*#ExtractClusters#scan`` properties on each configuration.</span>
+<span class="sd">    seen : set or None</span>
+<span class="sd">        Molecule sets already emitted (as frozensets); updated in place. Pass</span>
+<span class="sd">        the same set across calls on the same frame to avoid duplicates.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    (configurations, records, info)</span>
+<span class="sd">        New configurations; one metadata dict per cluster with keys</span>
+<span class="sd">        ``name, n, molecules, seed, order, rg, dmax, n_edges, degrees, motif,</span>
+<span class="sd">        bin``; and an ``info`` dict with ``edges`` (the bin edges used, or</span>
+<span class="sd">        None), ``attempts``, ``per_key`` quota, ``n_molecules`` and</span>
+<span class="sd">        ``n_contacts`` of the frame's graph, and ``warning`` (a message or</span>
+<span class="sd">        None) if fewer than requested were produced.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"The cluster size must be &gt;= 2"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">spread_metric</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">SPREAD_METRICS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"spread_metric must be one of </span><span class="si">{</span><span class="n">SPREAD_METRICS</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_samples</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"The number of clusters must be &gt;= 1"</span><span class="p">)</span>
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">rng</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_attempts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">max_attempts</span> <span class="o">=</span> <span class="mi">50</span> <span class="o">*</span> <span class="n">n_samples</span>
+    <span class="k">if</span> <span class="n">seen</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="n">periodic</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">periodicity</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="n">check_bonds</span><span class="p">(</span><span class="n">configuration</span><span class="p">)</span>
+    <span class="n">molecules</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">configuration</span><span class="o">.</span><span class="n">find_molecules</span><span class="p">(</span><span class="n">as_indices</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span>
+    <span class="n">n_mol</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">molecules</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_mol</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"The configuration has only </span><span class="si">{</span><span class="n">n_mol</span><span class="si">}</span><span class="s2"> molecules; cannot make </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">-mers"</span>
+        <span class="p">)</span>
+    <span class="n">atom_mol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">n_atoms</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">molecules</span><span class="p">):</span>
+        <span class="n">atom_mol</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">k</span>
+
+    <span class="k">if</span> <span class="n">periodic</span><span class="p">:</span>
+        <span class="c1"># Fractional, molecules kept whole across the boundary.</span>
+        <span class="n">frac</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">atoms</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">(</span>
+            <span class="n">fractionals</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">in_cell</span><span class="o">=</span><span class="s2">"molecule"</span><span class="p">,</span> <span class="n">as_array</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">to_cartesians_transform</span><span class="p">(</span><span class="n">as_array</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">cell_parameters</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">parameters</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">frac</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">atoms</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">(</span><span class="n">fractionals</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">as_array</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+        <span class="n">cell_parameters</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">frac_centroids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">frac</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">molecules</span><span class="p">])</span>
+
+    <span class="n">symbols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">atoms</span><span class="o">.</span><span class="n">symbols</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">contact_elements</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">contact_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">symbols</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">contact_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">symbols</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">contact_elements</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">contact_mask</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"No atoms match the contact elements </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">contact_elements</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+
+    <span class="n">adj</span> <span class="o">=</span> <span class="n">molecule_neighbour_graph</span><span class="p">(</span>
+        <span class="n">frac</span><span class="p">,</span> <span class="n">atom_mol</span><span class="p">,</span> <span class="n">contact_mask</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">periodic</span><span class="p">,</span> <span class="n">cell_parameters</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">adj</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No molecular contacts within </span><span class="si">{</span><span class="n">cutoff</span><span class="si">}</span><span class="s2"> Å"</span><span class="p">)</span>
+    <span class="n">n_contacts</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="o">//</span> <span class="mi">2</span>
+
+    <span class="k">if</span> <span class="n">motifs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">motifs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">motifs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">coordination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">coordination</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coordination</span><span class="p">}</span>
+
+    <span class="c1"># Stratification bins -----------------------------------------------------</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">spread_bins</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">)):</span>
+        <span class="c1"># Choose edges from the data: equal-quantile bins of the spread</span>
+        <span class="c1"># coordinate over an unstratified pilot sample.</span>
+        <span class="n">n_bins_requested</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">spread_bins</span><span class="p">)</span>
+        <span class="n">pilot</span> <span class="o">=</span> <span class="n">pilot_spreads</span><span class="p">(</span>
+            <span class="n">adj</span><span class="p">,</span>
+            <span class="n">n</span><span class="p">,</span>
+            <span class="n">frac_centroids</span><span class="p">,</span>
+            <span class="n">T</span><span class="p">,</span>
+            <span class="n">periodic</span><span class="p">,</span>
+            <span class="n">spread_metric</span><span class="p">,</span>
+            <span class="n">n_mol</span><span class="p">,</span>
+            <span class="n">rng</span><span class="p">,</span>
+            <span class="n">n_pilot</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">20</span> <span class="o">*</span> <span class="n">n_bins_requested</span><span class="p">),</span>
+            <span class="n">motifs</span><span class="o">=</span><span class="n">motifs</span><span class="p">,</span>
+            <span class="n">coordination</span><span class="o">=</span><span class="n">coordination</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pilot</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">n_bins_requested</span><span class="p">:</span>
+            <span class="n">what</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">-mers"</span>
+            <span class="k">if</span> <span class="n">motifs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">what</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" with motif(s) </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">motifs</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="k">if</span> <span class="n">coordination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">what</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" with centre coordination </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">coordination</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Too few </span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> found (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pilot</span><span class="p">)</span><span class="si">}</span><span class="s2">) to choose "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">n_bins_requested</span><span class="si">}</span><span class="s2"> spread bins; use fewer bins or no stratification"</span>
+            <span class="p">)</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">pilot</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">n_bins_requested</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">edges</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="mf">1e-9</span>
+        <span class="n">edges</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1e-9</span>
+    <span class="k">elif</span> <span class="n">spread_bins</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">spread_bins</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">edges</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"spread_bins must give at least two bin edges"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"spread_bins edges must be strictly increasing"</span><span class="p">)</span>
+    <span class="n">n_bins</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">edges</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">stratified</span> <span class="o">=</span> <span class="n">edges</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">balance_motifs</span>
+
+    <span class="n">atnos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">atoms</span><span class="o">.</span><span class="n">atomic_numbers</span><span class="p">)</span>
+    <span class="n">bond_pairs</span><span class="p">,</span> <span class="n">bond_orders</span> <span class="o">=</span> <span class="n">bond_index_pairs</span><span class="p">(</span><span class="n">configuration</span><span class="p">)</span>
+    <span class="n">bond_indices</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bond_pairs</span><span class="p">):</span>
+        <span class="n">bond_indices</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">system</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">system_db</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">system_db</span>
+        <span class="n">systems</span> <span class="o">=</span> <span class="n">system_db</span><span class="o">.</span><span class="n">get_systems</span><span class="p">(</span><span class="n">system_name</span><span class="p">)</span>
+        <span class="n">system</span> <span class="o">=</span> <span class="n">systems</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">systems</span> <span class="k">else</span> <span class="n">system_db</span><span class="o">.</span><span class="n">create_system</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">system_name</span><span class="p">)</span>
+
+    <span class="c1"># Quotas: each (motif?, bin) key gets an equal share of n_samples over the</span>
+    <span class="c1"># keys seen so far -- the motif set is not known in advance.</span>
+    <span class="n">per_key</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">configurations</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">()</span>
+    <span class="n">attempts</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">n_rejected_motif</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">n_rejected_coordination</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">configurations</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">n_samples</span> <span class="ow">and</span> <span class="n">attempts</span> <span class="o">&lt;</span> <span class="n">max_attempts</span><span class="p">:</span>
+        <span class="n">attempts</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">seed</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="n">n_mol</span><span class="p">))</span>
+        <span class="n">grown</span> <span class="o">=</span> <span class="n">grow_connected</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">grown</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">order</span><span class="p">,</span> <span class="n">parent</span> <span class="o">=</span> <span class="n">grown</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">order</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">shifts</span> <span class="o">=</span> <span class="n">unwrap_shifts</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">frac_centroids</span><span class="p">,</span> <span class="n">periodic</span><span class="p">)</span>
+        <span class="n">cen</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">frac_centroids</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">+</span> <span class="n">shifts</span><span class="p">[</span><span class="n">m</span><span class="p">])</span> <span class="o">@</span> <span class="n">T</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">order</span><span class="p">])</span>
+        <span class="n">rg</span><span class="p">,</span> <span class="n">dmax</span> <span class="o">=</span> <span class="n">_spreads</span><span class="p">(</span><span class="n">cen</span><span class="p">)</span>
+        <span class="n">spread</span> <span class="o">=</span> <span class="n">rg</span> <span class="k">if</span> <span class="n">spread_metric</span> <span class="o">==</span> <span class="s2">"rg"</span> <span class="k">else</span> <span class="n">dmax</span>
+
+        <span class="n">motif</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="n">degrees</span> <span class="o">=</span> <span class="n">cluster_motif</span><span class="p">(</span><span class="n">adj</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">motifs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">motif</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">:</span>
+            <span class="n">n_rejected_motif</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">coordination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">degrees</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">coordination</span><span class="p">:</span>
+            <span class="n">n_rejected_coordination</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">edges</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">digitize</span><span class="p">(</span><span class="n">spread</span><span class="p">,</span> <span class="n">edges</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">b</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">b</span> <span class="o">&gt;=</span> <span class="n">n_bins</span><span class="p">:</span>
+                <span class="k">continue</span>  <span class="c1"># outside requested range</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">qkey</span> <span class="o">=</span> <span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">if</span> <span class="n">balance_motifs</span> <span class="k">else</span> <span class="p">(</span><span class="n">b</span><span class="p">,)</span>
+        <span class="k">if</span> <span class="n">stratified</span><span class="p">:</span>
+            <span class="c1"># equal share per key, over bins x (motifs seen so far)</span>
+            <span class="k">if</span> <span class="n">balance_motifs</span><span class="p">:</span>
+                <span class="n">n_motifs</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">({</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">counts</span><span class="p">}</span> <span class="o">|</span> <span class="p">{</span><span class="n">motif</span><span class="p">}))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">n_motifs</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">per_key</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">n_samples</span> <span class="o">/</span> <span class="p">(</span><span class="n">n_bins</span> <span class="o">*</span> <span class="n">n_motifs</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">counts</span><span class="p">[</span><span class="n">qkey</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">per_key</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+        <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">counts</span><span class="p">[</span><span class="n">qkey</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># Build the cluster ---------------------------------------------------</span>
+        <span class="n">atom_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">molecules</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">order</span><span class="p">])</span>
+        <span class="n">xyz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([(</span><span class="n">frac</span><span class="p">[</span><span class="n">molecules</span><span class="p">[</span><span class="n">m</span><span class="p">]]</span> <span class="o">+</span> <span class="n">shifts</span><span class="p">[</span><span class="n">m</span><span class="p">])</span> <span class="o">@</span> <span class="n">T</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">order</span><span class="p">])</span>
+        <span class="n">xyz</span> <span class="o">-=</span> <span class="n">xyz</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># centre the cluster at the origin</span>
+        <span class="n">to_new</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">old</span><span class="p">):</span> <span class="n">new</span> <span class="k">for</span> <span class="n">new</span><span class="p">,</span> <span class="n">old</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">atom_indices</span><span class="p">)}</span>
+        <span class="n">Is</span><span class="p">,</span> <span class="n">Js</span><span class="p">,</span> <span class="n">orders</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">atom_indices</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">bond_indices</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="p">()):</span>
+                <span class="n">i0</span><span class="p">,</span> <span class="n">j0</span> <span class="o">=</span> <span class="n">bond_pairs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">j0</span> <span class="ow">in</span> <span class="n">to_new</span><span class="p">:</span>
+                    <span class="n">Is</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to_new</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">i0</span><span class="p">)])</span>
+                    <span class="n">Js</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to_new</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">j0</span><span class="p">)])</span>
+                    <span class="k">if</span> <span class="n">bond_orders</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">orders</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bond_orders</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+
+        <span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}{</span><span class="n">seed</span><span class="si">}</span><span class="s2">_"</span> <span class="o">+</span> <span class="s2">"-"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">order</span><span class="p">))</span>
+        <span class="n">conf</span> <span class="o">=</span> <span class="n">system</span><span class="o">.</span><span class="n">create_configuration</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">periodicity</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">coordinate_system</span><span class="o">=</span><span class="s2">"Cartesian"</span><span class="p">,</span> <span class="n">make_current</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="n">conf</span><span class="o">.</span><span class="n">atoms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">atno</span><span class="o">=</span><span class="n">atnos</span><span class="p">[</span><span class="n">atom_indices</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+            <span class="n">x</span><span class="o">=</span><span class="n">xyz</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">xyz</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+            <span class="n">z</span><span class="o">=</span><span class="n">xyz</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">Is</span><span class="p">:</span>
+            <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">if</span> <span class="n">bond_orders</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"bondorder"</span><span class="p">]</span> <span class="o">=</span> <span class="n">orders</span>
+            <span class="n">conf</span><span class="o">.</span><span class="n">bonds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="o">=</span><span class="p">[</span><span class="n">ids</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">Is</span><span class="p">],</span> <span class="n">j</span><span class="o">=</span><span class="p">[</span><span class="n">ids</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">Js</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">rec</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
+            <span class="n">molecules</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">order</span><span class="p">),</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+            <span class="n">order</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">order</span><span class="p">),</span>
+            <span class="n">rg</span><span class="o">=</span><span class="n">rg</span><span class="p">,</span>
+            <span class="n">dmax</span><span class="o">=</span><span class="n">dmax</span><span class="p">,</span>
+            <span class="n">n_edges</span><span class="o">=</span><span class="n">n_edges</span><span class="p">,</span>
+            <span class="n">degrees</span><span class="o">=</span><span class="n">degrees</span><span class="p">,</span>
+            <span class="n">motif</span><span class="o">=</span><span class="n">motif</span><span class="p">,</span>
+            <span class="nb">bin</span><span class="o">=</span><span class="n">b</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">store_properties</span><span class="p">:</span>
+            <span class="n">_put</span> <span class="o">=</span> <span class="n">make_put_property</span><span class="p">(</span><span class="n">conf</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"cluster size"</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"spread rg"</span><span class="p">,</span> <span class="n">rg</span><span class="p">,</span> <span class="s2">"Å"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"spread dmax"</span><span class="p">,</span> <span class="n">dmax</span><span class="p">,</span> <span class="s2">"Å"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"n edges"</span><span class="p">,</span> <span class="n">n_edges</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"motif"</span><span class="p">,</span> <span class="n">motif</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"str"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"centre coordination"</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">degrees</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"degrees"</span><span class="p">,</span> <span class="s2">"-"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">degrees</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"str"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span><span class="s2">"spread bin"</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">)</span>
+            <span class="n">_put</span><span class="p">(</span>
+                <span class="s2">"source molecules"</span><span class="p">,</span> <span class="s2">"-"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">order</span><span class="p">)),</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"str"</span>
+            <span class="p">)</span>
+        <span class="n">configurations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">conf</span><span class="p">)</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
+
+    <span class="n">warning</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">configurations</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">n_samples</span><span class="p">:</span>
+        <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Produced </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">configurations</span><span class="p">)</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="n">n_samples</span><span class="si">}</span><span class="s2"> requested </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">-mers "</span>
+            <span class="sa">f</span><span class="s2">"after </span><span class="si">{</span><span class="n">attempts</span><span class="si">}</span><span class="s2"> attempts"</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">motifs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warning</span> <span class="o">+=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"; </span><span class="si">{</span><span class="n">n_rejected_motif</span><span class="si">}</span><span class="s2"> candidates were rejected for not being one of "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">motifs</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">coordination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warning</span> <span class="o">+=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"; </span><span class="si">{</span><span class="n">n_rejected_coordination</span><span class="si">}</span><span class="s2"> candidates were rejected for a centre "</span>
+                <span class="sa">f</span><span class="s2">"coordination not in </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">coordination</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">stratified</span><span class="p">:</span>
+            <span class="n">warning</span> <span class="o">+=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">" (per-key quota </span><span class="si">{</span><span class="n">per_key</span><span class="si">}</span><span class="s2">). Quotas for (motif, bin) cells that "</span>
+                <span class="s2">"never occur cannot fill -- e.g. rings only exist in the compact "</span>
+                <span class="s2">"bins -- so a short fill here usually reflects the physics rather "</span>
+                <span class="s2">"than a sampling problem. Check the motif x bin table and revisit "</span>
+                <span class="s2">"the stratification or motif balancing if needed."</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">warning</span> <span class="o">+=</span> <span class="p">(</span>
+                <span class="s2">". The frame may not contain that many distinct connected "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">-mers within the contact cutoff."</span>
+            <span class="p">)</span>
+
+    <span class="n">info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">edges</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">edges</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">edges</span><span class="p">],</span>
+        <span class="n">attempts</span><span class="o">=</span><span class="n">attempts</span><span class="p">,</span>
+        <span class="n">per_key</span><span class="o">=</span><span class="n">per_key</span><span class="p">,</span>
+        <span class="n">n_molecules</span><span class="o">=</span><span class="n">n_mol</span><span class="p">,</span>
+        <span class="n">n_contacts</span><span class="o">=</span><span class="n">n_contacts</span><span class="p">,</span>
+        <span class="n">rejected_motif</span><span class="o">=</span><span class="n">n_rejected_motif</span><span class="p">,</span>
+        <span class="n">rejected_coordination</span><span class="o">=</span><span class="n">n_rejected_coordination</span><span class="p">,</span>
+        <span class="n">warning</span><span class="o">=</span><span class="n">warning</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">configurations</span><span class="p">,</span> <span class="n">records</span><span class="p">,</span> <span class="n">info</span></div>
+
+
+
+<div class="viewcode-block" id="cluster_summary">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.cluster_sampling.cluster_summary">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cluster_summary</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="n">edges</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Tabulate how a set of extracted n-mers is distributed over motif and</span>
+<span class="sd">    spread bin -- the quick check that the set is actually balanced.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    records : [dict]</span>
+<span class="sd">        The records from :func:`extract_nmers`.</span>
+<span class="sd">    edges : [float] or None</span>
+<span class="sd">        The bin edges, printed as a final line if given.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">    """</span>
+    <span class="n">tab</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">((</span><span class="n">r</span><span class="p">[</span><span class="s2">"motif"</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="s2">"bin"</span><span class="p">])</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">motifs</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">tab</span><span class="p">})</span>
+    <span class="n">bins</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">b</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">tab</span><span class="p">})</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="nb">max</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">))</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="s2">" "</span> <span class="o">*</span> <span class="n">w</span> <span class="o">+</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="p">(</span><span class="s1">'bin</span><span class="si">%d</span><span class="s1">'</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">'total'</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">"</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="n">header</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">:</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="p">[</span><span class="n">tab</span><span class="p">[(</span><span class="n">m</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">m</span><span class="si">:</span><span class="s2">&lt;</span><span class="si">{</span><span class="n">w</span><span class="si">}}</span><span class="s2">"</span> <span class="o">+</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">c</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">row</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sum</span><span class="p">(</span><span class="n">row</span><span class="p">)</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">tot</span> <span class="o">=</span> <span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">tab</span><span class="p">[(</span><span class="n">m</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+    <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">'total'</span><span class="si">:</span><span class="s2">&lt;</span><span class="si">{</span><span class="n">w</span><span class="si">}}</span><span class="s2">"</span> <span class="o">+</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">c</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">tot</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sum</span><span class="p">(</span><span class="n">tot</span><span class="p">)</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">edges</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="s2">"bins (Å): "</span>
+            <span class="o">+</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">e</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">e</span><span class="p">[</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step.cluster_sampling</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

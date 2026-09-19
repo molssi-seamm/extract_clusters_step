@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Developer Guide &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="2026-09-17: Cluster (n-mer) extraction for MLFF data" href="campaigns/2026-09-17/index.html" />
+    <link rel="prev" title="User Guide" href="../user/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="campaigns/2026-09-17/index.html" title="2026-09-17: Cluster (n-mer) extraction for MLFF data"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../user/index.html" title="User Guide"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Developer Guide</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="developer-guide">
+<h1>Developer Guide<a class="headerlink" href="#developer-guide" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="campaigns/2026-09-17/index.html">2026-09-17: Cluster (n-mer) extraction for MLFF data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="campaigns/2026-09-18/index.html">2026-09-18: Reproducibility, motif selection, many frames</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">extract_clusters_step</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+</ul>
+</div>
+<section id="code-layout">
+<h2>Code layout<a class="headerlink" href="#code-layout" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">extract_clusters_step/cluster_sampling.py</span></code></dt><dd><p>The algorithm, free of any SEAMM dependency: <code class="docutils literal notranslate"><span class="pre">molecule_neighbour_graph</span></code>,
+<code class="docutils literal notranslate"><span class="pre">grow_connected</span></code>, <code class="docutils literal notranslate"><span class="pre">unwrap_shifts</span></code>, <code class="docutils literal notranslate"><span class="pre">classify_motif</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bond_index_pairs</span></code>, <code class="docutils literal notranslate"><span class="pre">extract_nmers</span></code> and <code class="docutils literal notranslate"><span class="pre">cluster_summary</span></code>. Unit
+tested directly in <code class="docutils literal notranslate"><span class="pre">tests/test_cluster_sampling.py</span></code> (pure numpy) and
+<code class="docutils literal notranslate"><span class="pre">tests/test_extract_nmers.py</span></code> (on a synthetic periodic water box).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">extract_clusters_step/extract_clusters.py</span></code></dt><dd><p>The <code class="docutils literal notranslate"><span class="pre">seamm.Node</span></code>: parses the parameters, calls <code class="docutils literal notranslate"><span class="pre">extract_nmers</span></code> once
+per requested size sharing one <code class="docutils literal notranslate"><span class="pre">seen</span></code> set, writes <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code> and
+prints the motif × bin summary.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">extract_clusters_step/tk_extract_clusters.py</span></code></dt><dd><p>The dialog; <code class="docutils literal notranslate"><span class="pre">reset_dialog</span></code> shows only the stratification controls that
+apply to the chosen scheme.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">extract_clusters_step/data/properties.csv</span></code></dt><dd><p>Registers the <code class="docutils literal notranslate"><span class="pre">#ExtractClusters#scan</span></code> properties with molsystem at
+import.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Developer Guide</a><ul>
+<li><a class="reference internal" href="#code-layout">Code layout</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="../user/index.html"
+                          title="previous chapter">User Guide</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="campaigns/2026-09-17/index.html"
+                          title="next chapter">2026-09-17: Cluster (n-mer) extraction for MLFF data</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/developer/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="campaigns/2026-09-17/index.html" title="2026-09-17: Cluster (n-mer) extraction for MLFF data"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../user/index.html" title="User Guide"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Developer Guide</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

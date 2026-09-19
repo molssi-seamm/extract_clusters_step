@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>extract_clusters_step.extract_clusters_step &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step.extract_clusters_step</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for extract_clusters_step.extract_clusters_step</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">extract_clusters_step</span>
+
+
+<div class="viewcode-block" id="ExtractClustersStep">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ExtractClustersStep</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Helper class needed for the stevedore integration.</span>
+
+<span class="sd">    This must provide a description() method that returns a dict containing a</span>
+<span class="sd">    description of this node, and create_node() and create_tk_node() methods</span>
+<span class="sd">    for creating the graphical and non-graphical nodes.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    my_description : {description, group, name}</span>
+<span class="sd">        A human-readable description of this step. It can be</span>
+<span class="sd">        several lines long, and needs to be clear to non-expert users.</span>
+<span class="sd">        It contains the following keys: description, group, name.</span>
+<span class="sd">    my_description["description"] : tuple</span>
+<span class="sd">        A description of the Extract Clusters step. It must be</span>
+<span class="sd">        clear to non-experts.</span>
+<span class="sd">    my_description["group"] : str</span>
+<span class="sd">        Which group in the menus to put this step. If the group does</span>
+<span class="sd">        not exist it will be created. Common groups are "Building",</span>
+<span class="sd">        "Calculations", "Control" and "Data".</span>
+<span class="sd">    my_description["name"] : str</span>
+<span class="sd">        The name of this step, to be displayed in the menus.</span>
+<span class="sd">    """</span>
+
+    <span class="n">my_description</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"description"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="s2">"Extract molecular clusters (trimers, tetramers, ... larger n-mers) "</span>
+            <span class="s2">"from a condensed-phase, typically periodic, configuration as "</span>
+            <span class="s2">"unwrapped, non-periodic structures, e.g. for many-body training data "</span>
+            <span class="s2">"and diagnostics for machine-learned force fields."</span>
+        <span class="p">),</span>
+        <span class="s2">"group"</span><span class="p">:</span> <span class="s2">"Building"</span><span class="p">,</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Extract Clusters"</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flowchart</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gui</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize this helper class, which is used by</span>
+<span class="sd">        the application via stevedore to get information about</span>
+<span class="sd">        and create node objects for the flowchart</span>
+<span class="sd">        """</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="ExtractClustersStep.description">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.description">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return a description of what this extension does."""</span>
+        <span class="k">return</span> <span class="n">ExtractClustersStep</span><span class="o">.</span><span class="n">my_description</span></div>
+
+
+<div class="viewcode-block" id="ExtractClustersStep.create_node">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_node">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flowchart</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Create and return the new node object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        flowchart: seamm.Node</span>
+<span class="sd">            A non-graphical SEAMM node</span>
+
+<span class="sd">        **kwargs : keyworded arguments</span>
+<span class="sd">            Various keyworded arguments such as title, namespace or</span>
+<span class="sd">            extension representing the title displayed in the flowchart,</span>
+<span class="sd">            the namespace for the plugins of a subflowchart and</span>
+<span class="sd">            the extension, respectively.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ExtractClusters</span>
+
+<span class="sd">        See Also</span>
+<span class="sd">        --------</span>
+<span class="sd">        ExtractClusters</span>
+
+<span class="sd">        """</span>
+
+        <span class="k">return</span> <span class="n">extract_clusters_step</span><span class="o">.</span><span class="n">ExtractClusters</span><span class="p">(</span><span class="n">flowchart</span><span class="o">=</span><span class="n">flowchart</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExtractClustersStep.create_tk_node">
+<a class="viewcode-back" href="../../developer/extract_clusters_step.html#extract_clusters_step.extract_clusters_step.ExtractClustersStep.create_tk_node">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_tk_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">canvas</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Create and return the graphical Tk node object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        canvas : tk.Canvas</span>
+<span class="sd">            The Tk Canvas widget</span>
+
+<span class="sd">        **kwargs : keyworded arguments</span>
+<span class="sd">            Various keyworded arguments such as tk_flowchart, node, x, y, w, h</span>
+<span class="sd">            representing a graphical flowchart object, a non-graphical node for</span>
+<span class="sd">            a step, and dimensions of the graphical node.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        TkExtractClusters</span>
+
+<span class="sd">        See Also</span>
+<span class="sd">        --------</span>
+<span class="sd">        TkExtractClusters</span>
+<span class="sd">        """</span>
+
+        <span class="k">return</span> <span class="n">extract_clusters_step</span><span class="o">.</span><span class="n">TkExtractClusters</span><span class="p">(</span><span class="n">canvas</span><span class="o">=</span><span class="n">canvas</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">extract_clusters_step.extract_clusters_step</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

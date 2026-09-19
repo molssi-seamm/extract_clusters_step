@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>SEAMM Extract Clusters Plug-in &#8212; SEAMM Extract Clusters Plug-in 2026.9.19 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=e8f1854e"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">SEAMM Extract Clusters Plug-in</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="seamm-extract-clusters-plug-in">
+<h1>SEAMM Extract Clusters Plug-in<a class="headerlink" href="#seamm-extract-clusters-plug-in" title="Link to this heading">¶</a></h1>
+<a class="reference external image-reference" href="https://github.com/molssi-seamm/extract_clusters_step/pulls"><img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr-raw/molssi-seamm/extract_clusters_step" />
+</a>
+<a class="reference external image-reference" href="https://github.com/molssi-seamm/extract_clusters_step/actions"><img alt="Build Status" src="https://github.com/molssi-seamm/extract_clusters_step/workflows/CI/badge.svg" />
+</a>
+<a class="reference external image-reference" href="https://codecov.io/gh/molssi-seamm/extract_clusters_step"><img alt="Code Coverage" src="https://codecov.io/gh/molssi-seamm/extract_clusters_step/branch/master/graph/badge.svg" />
+</a>
+<a class="reference external image-reference" href="https://lgtm.com/projects/g/molssi-seamm/extract_clusters_step/context:python"><img alt="Code Quality" src="https://img.shields.io/lgtm/grade/python/g/molssi-seamm/extract_clusters_step.svg?logo=lgtm&amp;logoWidth=18" />
+</a>
+<a class="reference external image-reference" href="https://molssi-seamm.github.io/extract_clusters_step/index.html"><img alt="Documentation Status" src="https://github.com/molssi-seamm/extract_clusters_step/workflows/Documentation/badge.svg" />
+</a>
+<a class="reference external image-reference" href="https://pyup.io/repos/github/molssi-seamm/extract_clusters_step/"><img alt="Updates for Dependencies" src="https://pyup.io/repos/github/molssi-seamm/extract_clusters_step/shield.svg" />
+</a>
+<a class="reference external image-reference" href="https://pypi.python.org/pypi/extract_clusters_step"><img alt="PyPi VERSION" src="https://img.shields.io/pypi/v/extract_clusters_step.svg" />
+</a>
+<p>A SEAMM plug-in for extracting molecular clusters (trimers, tetramers, … larger
+n-mers) from a condensed-phase, typically periodic, configuration as unwrapped,
+non-periodic structures – e.g. many-body training data and diagnostics for
+machine-learned force fields.</p>
+<ul class="simple">
+<li><p>Free software: BSD-3-Clause</p></li>
+<li><p>Documentation: <a class="reference external" href="https://molssi-seamm.github.io/extract_clusters_step/index.html">https://molssi-seamm.github.io/extract_clusters_step/index.html</a></p></li>
+<li><p>Code: <a class="reference external" href="https://github.com/molssi-seamm/extract_clusters_step">https://github.com/molssi-seamm/extract_clusters_step</a></p></li>
+</ul>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Clusters are <strong>connected subgraphs of a molecular contact graph</strong> (molecules
+are in contact if their contact atoms are within a cutoff, minimum image), so
+chains, rings and stars all occur – not just the most compact cluster.</p></li>
+<li><p>Any cluster size, and several sizes per frame (e.g. <code class="docutils literal notranslate"><span class="pre">3,</span> <span class="pre">4</span></code>).</p></li>
+<li><p>Works on many frames in one step – all configurations of a system holding a
+trajectory, or any standard SEAMM structure selection – so no loop is needed
+and the clusters land in one system.</p></li>
+<li><p><strong>Stratification</strong> so the set is flat in a spread coordinate (radius of
+gyration or largest centroid separation), with bin edges from equal quantiles
+of a pilot sample or given explicitly; optional balancing over the
+contact-graph motif.</p></li>
+<li><p>Clusters are unwrapped across the periodic boundary, centred, non-periodic,
+with molecules and bonds intact.</p></li>
+<li><p>Provenance on every configuration: unique names
+<code class="docutils literal notranslate"><span class="pre">&lt;frame&gt;_&lt;seed&gt;_&lt;m1-m2-...&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">#ExtractClusters#scan</span></code> properties (size,
+spread, motif, contacts, source molecules) that survive SDF/extxyz export;
+a <code class="docutils literal notranslate"><span class="pre">clusters.csv</span></code> summary per step.</p></li>
+<li><p>Works on any cell (orthorhombic fast path via a periodic KD-tree; exact
+minimum image otherwise) and on non-periodic sources.</p></li>
+</ul>
+</section>
+<section id="acknowledgements">
+<h2>Acknowledgements<a class="headerlink" href="#acknowledgements" title="Link to this heading">¶</a></h2>
+<p>This package was created with <a class="reference external" href="https://github.com/audreyr/cookiecutter">Cookiecutter</a> and the
+<a class="reference external" href="https://github.com/molssi-seamm/cookiecutter-seamm-plugin">molssi-seamm/cookiecutter-seamm-plugin</a> project template.</p>
+<p>Developed by the Molecular Sciences Software Institute (<a class="reference external" href="https://molssi.org">MolSSI</a>),
+which receives funding from the <a class="reference external" href="https://www.nsf.gov">National Science Foundation</a> under
+award ACI-1547580</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">SEAMM Extract Clusters Plug-in</a><ul>
+<li><a class="reference internal" href="#features">Features</a></li>
+<li><a class="reference internal" href="#acknowledgements">Acknowledgements</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/readme.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">SEAMM Extract Clusters Plug-in 2026.9.19 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">SEAMM Extract Clusters Plug-in</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Molecular Sciences Software Institute (MolSSI).
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>
